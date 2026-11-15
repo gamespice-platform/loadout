@@ -4,7 +4,7 @@ Part of TMC's **Dot** collection: modular, MIT-licensed building blocks for game
 
 ## Install
 
-Copy `addons/dot_loadout/` and [dot-core](https://github.com/modcommunity/dot-core)'s `addons/dot_core/` into your project and enable both in **Project > Project Settings > Plugins**. dot-core is the only dependency.
+Copy `addons/dot_loadout/` and [dot-core](https://github.com/gamespice-platform/core)'s `addons/dot_core/` into your project and enable both in **Project > Project Settings > Plugins**. dot-core is the only dependency.
 
 ## Use
 
