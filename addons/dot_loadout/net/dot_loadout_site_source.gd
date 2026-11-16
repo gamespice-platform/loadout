@@ -1,13 +1,10 @@
 class_name DotLoadoutSiteSource
 extends RefCounted
 
-## Entitlements, app points and the saved loadout from the site store, for one game server.
-## Bind [method source] to [member DotLoadoutManager.entitlement_source]; it answers from a cache,
-## refreshes when stale, and wants [method refresh] on join. Needs the STORE_READ scope.
-##
-## Only the signed token is trusted: TMC's answer must carry a token that verifies against the pinned
-## key ([member public_key]), names this server's scope ([member audience]) and this player, and has
-## not expired. Anything else is logged as an error and grants nothing. See docs/design.md "Site tokens".
+## Entitlements, app points and the saved loadout from the site store, for one game server. Bind
+## [method source] to [member DotLoadoutManager.entitlement_source]; call [method refresh] on join
+## (STORE_READ scope). Only a token verified against [member public_key] for [member audience], this
+## player and unexpired is trusted; else an error is logged and nothing is granted. See docs/design.md.
 
 ## A token was refused; the player gets no site entitlements until a read verifies.
 signal rejected(player_key: String, reason: String)
@@ -306,9 +303,9 @@ func source(player_key: String) -> DotLoadoutEntitlements:
 
 ## An `entitlement_source` that answers [param base] (a Callable taking the player key and returning a
 ## [DotLoadoutEntitlements]; invalid means none) plus what the site store says the player owns.
-## The backbone client is looked up from [DotRegistry] on first use, so a game with no backbone keeps
-## exactly its [param base] answer. [param config] holds the pinned key; null reads a layered
-## [DotLoadoutConfig] (file, `DOT_LOADOUT_*`, `--loadout-*`). Without a pinned key the site grants nothing.
+## The backbone client comes from [DotRegistry] on first use; with none the [param base] answer stands.
+## [param config] holds the pinned key (null reads a layered [DotLoadoutConfig]); without one the site
+## grants nothing.
 static func layered(base: Callable = Callable(), config: DotLoadoutConfig = null) -> Callable:
 	var site := DotLoadoutSiteSource.new()
 	return func(key: String) -> DotLoadoutEntitlements:

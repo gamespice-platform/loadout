@@ -103,11 +103,17 @@ func _test_site_source() -> void:
 	var base_only: DotLoadoutEntitlements = layered.call("p9")
 	_check(base_only.allows(_item_for("base_x")) and not base_only.allows(_item_for("rifle_x")), "layered without a backbone keeps only the base answer")
 	_done()
+	var cfg := await _test_site_token_rejection(site)
+	await _test_site_app_settings(cfg)
 
+
+## A signed token is verified, and every way of failing that clears the player's grants.
+func _test_site_token_rejection(site: FakeSite) -> DotLoadoutConfig:
 	_section("site token rejection")
+	var res: DotResult
 	var why: Array = []
 	site.body = _site_body("p2", [["app", "skin.gold", null]])
-	src = _signed_source(site)
+	var src := _signed_source(site)
 	src.rejected.connect(func(_p: String, reason: String) -> void: why.append(reason))
 	_check((await src.refresh("p2")).ok and src.ids_of("p2").size() == 1, "a good token is accepted first")
 	site.body["token"] = str(site.body["token"]).get_slice(".", 0) + "." + DotHash.base64url_encode("forged".to_ascii_buffer())
@@ -155,8 +161,13 @@ func _test_site_source() -> void:
 	var made := DotLoadoutSiteSource.from_config(cfg, site)
 	_check(made.ok and (made.value as DotLoadoutSiteSource).public_key == "FROMFILE", "site_public_key_path reads the key from a file", str(made))
 	_done()
+	return cfg
 
+
+## The app's settings feed: sections announced once, then only when their version changes.
+func _test_site_app_settings(cfg: DotLoadoutConfig) -> void:
 	_section("site app settings")
+	var res: DotResult
 	var feed := FakeSite.new()
 	feed.body = {"appId": "app1", "sections": {
 		"store": {"version": 3, "values": {"enabled": true, "maxLoadoutSlots": 0}},

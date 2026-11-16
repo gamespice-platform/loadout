@@ -2,9 +2,8 @@ class_name DotLoadoutSiteSettings
 extends RefCounted
 
 ## The app's public settings as TMC serves them (`GET settings`, any credential): `{appId, sections:
-## {<name>: {version, values}}}`, sections `store`, `avatars` and `stats` among them. [method refresh]
-## reads them; [method follow] keeps reading every [member poll_sec]. Each section whose `version`
-## changed emits [signal section_changed], so a game follows an owner's edits without a restart.
+## {<name>: {version, values}}}`. [method refresh] reads them; [method follow] repeats every
+## [member poll_sec]; a changed section `version` emits [signal section_changed].
 
 ## A section is new or its version changed. [param values] are TMC's field names as sent.
 signal section_changed(section: String, values: Dictionary, version: int)
