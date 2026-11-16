@@ -14,3 +14,6 @@ export_presets.cfg
 # OS
 .DS_Store
 Thumbs.db
+
+# dot-cloud is optional here; link or copy it to run the real Ed25519 token check.
+/addons/dot_cloud

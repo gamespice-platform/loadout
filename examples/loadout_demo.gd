@@ -44,6 +44,7 @@ func _run() -> void:
 	await _test_random_spawn()
 	await _test_free_by_default()
 	await _test_site_source()
+	await _test_site_source_ed25519()
 
 	DotPaths.remove_tree(LOADOUT_DIR)
 
@@ -185,6 +186,52 @@ func _test_site_source() -> void:
 
 
 ## A source pinned to "PINNED" for audience "game-test", with a verifier that accepts the "sig-ok" signature.
+## One token signed by an independent Ed25519 implementation, checked through dot-cloud's verifier
+## with no stand-in verifier. It skips (and says so) where dot-cloud, or a dot-cloud with verify_ed25519, is not beside this addon.
+const ED25519_SITE_KEY := "85Z3S4z-hQJcLBXdopf0QbpShS7IyO8RPSLuHZaOSwA"
+const ED25519_SITE_TOKEN := "eyJ2IjogMSwgImF1ZCI6ICJnYW1lLXRlc3QiLCAic3ViIjogInAxIiwgImlhdCI6IDE3MDAwMDAwMDAsICJleHAiOiA0MTAyNDQ0ODAwLCAiaXRlbXMiOiBbWyJhcHAiLCAic2tpbi5nb2xkIiwgbnVsbF1dLCAicG9pbnRzIjogMTIwLCAibG9hZG91dCI6IFtbInByaW1hcnkiLCAiYXBwIiwgInNraW4uZ29sZCJdXX0.6gt575erZsThmaQFQuOzW7s4-0ngNT9RaVE-DK5AFtISCXjnGdiQ3FWsRMlKbtFGgqhxJqdjDjXrj3SYEFmYAw"
+
+
+func _cloud_has_ed25519() -> bool:
+	if not ResourceLoader.exists(DotLoadoutSiteSource.CLOUD_SIGNATURE):
+		return false
+	var script: Script = load(DotLoadoutSiteSource.CLOUD_SIGNATURE)
+	for m: Dictionary in script.get_script_method_list():
+		if m.get("name") == "verify_ed25519":
+			return true
+	return false
+
+
+func _test_site_source_ed25519() -> void:
+	_section("site token, real Ed25519")
+	if not _cloud_has_ed25519():
+		_check(true, "skipped: no dot-cloud with verify_ed25519 beside this addon")
+		_check(true, "skipped: no Ed25519 verifier to refuse an edited payload")
+		_check(true, "skipped: no Ed25519 verifier to refuse another key")
+		_done()
+		return
+	var site := FakeSite.new()
+	site.body = {"ok": true, "player": "p1", "items": [], "points": {"enabled": true, "balance": 120, "label": "Gems"},
+		"token": ED25519_SITE_TOKEN, "ttl": 300, "alg": "Ed25519", "publicKey": ED25519_SITE_KEY}
+	var src := DotLoadoutSiteSource.with_client(site)
+	src.public_key = ED25519_SITE_KEY
+	src.audience = "game-test"
+	var res: DotResult = await src.refresh("p1")
+	_check(res.ok and src.ids_of("p1") == ["skin.gold"], "a token signed with Ed25519 verifies through dot-cloud and grants its items", str(res))
+	var parts := ED25519_SITE_TOKEN.split(".")
+	site.body["token"] = DotHash.base64url_encode_text(DotHash.base64url_decode_text(parts[0]).replace("skin.gold", "skin.free")) + "." + parts[1]
+	res = await src.refresh("p1")
+	_check(not res.ok and src.ids_of("p1").is_empty(), "the same signature over an edited payload is refused and grants nothing", str(res))
+	site.body["token"] = ED25519_SITE_TOKEN
+	var other := DotLoadoutSiteSource.with_client(site)
+	other.public_key = DotHash.base64url_encode(PackedByteArray([1]) + PackedByteArray([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]))
+	other.audience = "game-test"
+	site.body["publicKey"] = other.public_key
+	res = await other.refresh("p1")
+	_check(not res.ok and other.ids_of("p1").is_empty(), "a different pinned key refuses the token", str(res))
+	_done()
+
+
 func _signed_source(client: Object) -> DotLoadoutSiteSource:
 	var src := DotLoadoutSiteSource.with_client(client)
 	src.public_key = "PINNED"
