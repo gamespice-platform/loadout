@@ -71,6 +71,47 @@ extends DotConfig
 ## Seconds a fetched loadout stays cached after the player leaves.
 @export_range(0.0, 3600.0, 5.0) var cache_ttl_sec: float = 300.0
 
+@export_group("Site store")
+
+## The pinned TMC signing key: the `publicKey` TMC's entitlements answer carries (raw Ed25519, base64url),
+## copied once over a trusted channel, or an RSA public key PEM. Public, not a secret; never fetched.
+@export var site_public_key: String = ""
+
+## A file holding [member site_public_key] instead; set one of the two, not both.
+@export var site_public_key_path: String = ""
+
+## This server's scope name at TMC (its credential's scope); the token's `aud` must equal it.
+@export var site_audience: String = ""
+
+## Seconds a player's site answer is trusted before the next read; 0 keeps it until the token's `exp`.
+@export_range(0.0, 3600.0, 1.0, "or_greater") var site_ttl_sec: float = 30.0
+
+## Ask TMC for the member's app points and saved loadout with the entitlements.
+@export var site_include_points: bool = true
+@export var site_include_loadout: bool = true
+
+## Take `grant.unlock` ids from items the token verified. TMC does not sign the grant itself.
+@export var site_unsigned_grants: bool = true
+
+## Seconds between reads of the app's settings (store, avatars, stats); 0 reads once and stops.
+@export_range(0.0, 86400.0, 1.0, "or_greater") var site_settings_poll_sec: float = 60.0
+
+
+## The pinned site key from [member site_public_key] or [member site_public_key_path]; empty is a failure.
+func site_key() -> DotResult:
+	if site_public_key != "" and site_public_key_path != "":
+		return DotResult.fail(DotError.CODE_INVALID, "Set site_public_key or site_public_key_path, not both.")
+	if site_public_key_path != "":
+		if not FileAccess.file_exists(site_public_key_path):
+			return DotResult.fail(DotError.CODE_IO, "site_public_key_path does not exist: %s" % site_public_key_path)
+		var text := FileAccess.get_file_as_string(site_public_key_path).strip_edges()
+		if text == "":
+			return DotResult.fail(DotError.CODE_INVALID, "site_public_key_path is empty: %s" % site_public_key_path)
+		return DotResult.success(text)
+	if site_public_key.strip_edges() == "":
+		return DotResult.fail(DotError.CODE_STATE, "No pinned site key; set site_public_key or site_public_key_path.")
+	return DotResult.success(site_public_key.strip_edges())
+
 
 func env_prefix() -> String:
 	return "DOT_LOADOUT_"
@@ -94,6 +135,9 @@ func validate() -> DotResult:
 			"loadout.config",
 			"enforce_entitlements is off; any loadout will be accepted"
 		)
+
+	if site_public_key != "" and site_public_key_path != "":
+		return DotResult.fail(DotError.CODE_INVALID, "Set site_public_key or site_public_key_path, not both.")
 
 	return DotResult.success(null)
 

@@ -44,6 +44,21 @@ The other default is worse in a way that is hard to notice. A server that grante
 
 `DotItem.entitlement_id` is the indirection that makes a bundle possible: several items naming one unlock are granted together.
 
+## Site tokens
+
+`DotLoadoutSiteSource` reads `GET store/entitlements?player=<scoped key>&include=points,loadout` (STORE_READ) through any object with `get_integration` (dot-auth's `DotBackboneClient`, registry `dot_backbone_client`). TMC's answer carries an unsigned body (`items`, `points`, `loadout`) and a `token`: `<payload b64url>.<signature b64url>`, signed over the payload text, whose payload is `{v: 1, aud, sub, iat, exp, items: [[store, key, expiresAt]], points?, loadout?: [[slot, store, key]]}` (website-city docs/store-security.md). Only the token is trusted:
+
+- The signature must verify against the pinned key (`site_public_key`, or `site_public_key_path` naming a file). Pin TMC's `publicKey` once over a trusted channel; it is public and only changes when TMC rotates its secret. A body whose `publicKey` differs from the pinned one is refused with an error telling the operator to re-pin.
+- `aud` must equal `site_audience` (this server's scope name), `sub` the player asked about, `v` 1, and `exp` must be in the future. Nothing is used past `exp`.
+- Ids, the points balance and the loadout come from the token. The body only adds the points `label` and, while `site_unsigned_grants` is on, `grant.unlock` ids of items the token verified: TMC does not sign the grant, so turning it off is the strict choice.
+- Anything else (no key, no token, bad signature, wrong app or player, expired) clears the player's cached answer, logs an error on `loadout.site`, emits `rejected` and grants nothing. A rejected player is read again after `site_ttl_sec`.
+
+The check itself is dot-cloud's, loaded by path (`res://addons/dot_cloud/verify/dot_cloud_signature.gd`) so this addon still requires only dot-core. An RSA PEM key goes to its RSA-SHA256 `verify`; TMC's raw Ed25519 key needs `verify_ed25519(bytes, signature, key_bytes) -> DotResult`, which dot-cloud does not have yet (Godot's Crypto has no EdDSA). Until it does, every TMC token is refused, loudly: that is the point, since the alternative is trusting an answer nobody checked.
+
+A game wires it one of two ways. `DotLoadoutSiteSource.layered(base, config)` keeps the old one-liner and reads `site_*` from the given `DotLoadoutConfig`, or from a layered one (`DOT_LOADOUT_SITE_PUBLIC_KEY_PATH`, `--loadout-site-audience=...`) when none is given. `DotLoadoutSiteSource.from_config(config, client)` returns the source itself, for a game that also wants `points_of(player)` (`{enabled, balance, label}`, balance null while points are off), `loadout_of(player)` (`[{slot, store, key}]`) and the `refreshed`/`rejected` signals.
+
+`DotLoadoutSiteSettings` reads `GET settings` (any credential): `{appId, sections: {<name>: {version, values}}}` with TMC's public fields under each section (`store`, `avatars`, `stats`). `refresh()` reads once, `follow(tree)` reads every `site_settings_poll_sec` (0 reads once), and `section_changed(section, values, version)` fires for each section whose `version` moved. Values keep TMC's field names (`maxLoadoutSlots`, `appPointsEnabled`, `fallback`, `columns` ...). Set it as a source's `settings` and a store section with `enabled: false` grants nothing. dot-auth's client cannot send `If-None-Match`, so polling compares versions instead of using the ETag's bodyless 304.
+
 ## Retired is not deleted
 
 `DotItem.retired` keeps an item valid in a saved loadout while removing it from `choices_for`. Deleting the item instead makes every loadout containing it invalid at once, and `conform` then silently changes what a large number of players are carrying on the same day.

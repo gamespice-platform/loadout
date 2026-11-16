@@ -13,5 +13,8 @@ extends RefCounted
 #    of DotLoadoutValidator.validate/conform and DotLoadoutSchema.choices_for,
 #    DotLoadoutValidator.apply_fixed(); DotLoadoutCommand (the `loadout` command, the
 #    `loadout_menu` notice, the mp_loadout_* cvars, closed_fn for a game's own reason).
-const LEVEL := 2
+# 3: site tokens and TMC data: DotLoadoutSiteSource verifies the token (public_key, audience, verifier,
+#    verify_token, cloud_verify, from_config, points_of, loadout_of, rejected, refreshed, settings;
+#    layered's config argument); DotLoadoutSiteSettings; DotLoadoutConfig site_* and site_key().
+const LEVEL := 3
 const OLDEST := 1
