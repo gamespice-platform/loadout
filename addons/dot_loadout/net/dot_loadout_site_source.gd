@@ -15,11 +15,15 @@ const CHANNEL := "loadout.site"
 const PATH := "store/entitlements"
 ## dot-cloud's verifier, loaded by path so a game without dot-cloud still runs (and refuses every token).
 const CLOUD_SIGNATURE := "res://addons/dot_cloud/verify/dot_cloud_signature.gd"
-const TOKEN_VERSION := 1
+## The newest token version read; 2 signs each item's unlock ids, 1 signs only the item keys.
+const TOKEN_VERSION := 2
+const OLDEST_TOKEN_VERSION := 1
+## STORE_WRITE: buys an item with the member's app points and answers like [constant PATH].
+const PURCHASE_PATH := "store/purchase"
 ## The size of a raw Ed25519 public key, which is what TMC's `publicKey` holds.
 const ED25519_KEY_BYTES := 32
 
-## Any object with `get_integration(String, Dictionary) -> DotResult`.
+## Any object with `get_integration(String, Dictionary) -> DotResult` ([method purchase] also needs `post_integration`).
 var client: Object = null
 
 ## Seconds a player's answer is trusted before the next read is started; 0 keeps it until the token's `exp`.
@@ -35,8 +39,8 @@ var audience: String = ""
 var include_points: bool = true
 var include_loadout: bool = true
 
-## Take `grant.unlock` from items the token verified. The grant itself is not in the token.
-var unsigned_grants: bool = true
+## Also take `grant.unlock` from the unsigned body for keys a v1 token verified. Off: a v2 token signs the unlock ids.
+var unsigned_grants: bool = false
 
 ## Optional [DotLoadoutSiteSettings]; while its store section says `enabled: false` nothing is granted.
 var settings: Object = null
@@ -92,11 +96,12 @@ static func ids_from(body: Dictionary) -> Array:
 
 
 static func _grant_ids(item: Dictionary) -> Array:
-	var out: Array = []
 	var grant: Variant = item.get("grant")
-	if not grant is Dictionary:
-		return out
-	var extra: Variant = (grant as Dictionary).get("unlock")
+	return _unlock_ids((grant as Dictionary).get("unlock")) if grant is Dictionary else []
+
+
+static func _unlock_ids(extra: Variant) -> Array:
+	var out: Array = []
 	if extra is String and extra != "":
 		out.append(extra)
 	elif extra is Array:
@@ -131,7 +136,8 @@ static func verify_token(
 	if not payload is Dictionary:
 		return DotResult.fail(DotError.CODE_PARSE, "The token payload is not an object.")
 	var p: Dictionary = payload
-	if int(p.get("v", 0)) != TOKEN_VERSION:
+	var version := int(p.get("v", 0))
+	if version < OLDEST_TOKEN_VERSION or version > TOKEN_VERSION:
 		return DotResult.fail(DotError.CODE_VERSION, "Unknown token version %s." % str(p.get("v")))
 	if str(p.get("aud", "")) != p_audience:
 		return DotResult.fail(DotError.CODE_FORBIDDEN, "The token is for another app or server (aud %s)." % str(p.get("aud", "")))
@@ -176,9 +182,17 @@ func refresh(player_key: String) -> DotResult:
 	if not res.ok:
 		DotLog.warn(CHANNEL, "store entitlements read failed", {"error": str(res.error)})
 		return res
-	if not res.value is Dictionary:
+	return ingest(player_key, res.value)
+
+
+## Applies a TMC store answer that carries a token (an entitlements read or a [method purchase]) at once,
+## so a purchase counts without waiting for [member ttl_secs]. Same checks and value as [method refresh].
+func ingest(player_key: String, answer: Variant) -> DotResult:
+	if public_key == "" and not _configured:
+		_configure(null)
+	if not answer is Dictionary:
 		return _reject(player_key, DotResult.fail(DotError.CODE_INVALID, "The entitlements response is not an object."))
-	var body: Dictionary = res.value
+	var body: Dictionary = answer
 	var sent_key := str(body.get("publicKey", ""))
 	if sent_key != "" and public_key.strip_edges() != "" and not public_key.contains("BEGIN PUBLIC KEY") and sent_key != public_key.strip_edges():
 		return _reject(player_key, DotResult.fail(DotError.CODE_INTEGRITY,
@@ -212,7 +226,8 @@ func _reject(player_key: String, why: DotResult) -> DotResult:
 	return why
 
 
-## Ids come from the token's `items` ([store, key, expiresAt]); `grant.unlock` only for those keys.
+## Ids come from the token's `items` ([store, key, expiresAt] in v1, plus the unlock ids in v2); with
+## [member unsigned_grants] the body's `grant.unlock` is added for those keys.
 func _entry_from(p: Dictionary, body: Dictionary, now: float) -> Dictionary:
 	var ids := {}
 	var items: Variant = p.get("items", [])
@@ -225,6 +240,8 @@ func _entry_from(p: Dictionary, body: Dictionary, now: float) -> Dictionary:
 				continue
 			if str(a[1]) != "":
 				ids[str(a[1])] = true
+			for e: String in _unlock_ids(a[3] if a.size() > 3 else null):
+				ids[e] = true
 	if unsigned_grants:
 		var body_items: Variant = body.get("items", [])
 		if body_items is Array:
@@ -286,7 +303,7 @@ func _store_enabled() -> bool:
 ## Past [member ttl_secs] (when set) or the token's `exp`. A rejected answer (exp 0) waits only for the ttl,
 ## so a bad key does not turn every lookup into a read; with ttl 0 it is re-read on each lookup.
 func _stale(entry: Dictionary) -> bool:
-	if entry.is_empty():
+	if entry.is_empty() or entry.get("stale", false):
 		return true
 	if ttl_secs > 0.0 and Time.get_ticks_msec() / 1000.0 - float(entry["at"]) > ttl_secs:
 		return true
@@ -340,6 +357,43 @@ func _configure(config: DotLoadoutConfig) -> void:
 	include_points = s.include_points
 	include_loadout = s.include_loadout
 	unsigned_grants = s.unsigned_grants
+
+
+## Buys [param item_id] for the player with their app points (TMC's STORE_WRITE scope) and applies the
+## answer's token at once. The value is TMC's answer (`status`, `purchase`, `points`, `items`). An empty
+## [param idem_key] makes one, so a retry of the same press must pass the same key.
+func purchase(player_key: String, item_id: String, idem_key: String = "") -> DotResult:
+	if client == null or not client.has_method("post_integration"):
+		return DotResult.fail(DotError.CODE_STATE, "No backbone client with post_integration.")
+	if player_key == "" or item_id == "":
+		return DotResult.fail(DotError.CODE_INVALID, "A purchase needs a player and an item.")
+	var body := _query(player_key)
+	body["itemId"] = item_id
+	body["idemKey"] = idem_key if idem_key != "" else "%s:%s:%d:%d" % [player_key, item_id, Time.get_unix_time_from_system(), randi()]
+	var res: DotResult = await client.call("post_integration", PURCHASE_PATH, body)
+	if not res.ok:
+		DotLog.warn(CHANNEL, "store purchase failed", {"player": player_key, "item": item_id, "error": str(res.error)})
+		return res
+	var applied := ingest(player_key, res.value)
+	return DotResult.success(res.value) if applied.ok else applied
+
+
+## Waits for a read when the player's answer is stale (or [param force]); a fresh one is returned as is.
+## Call on join so the first loadout check sees the site items, not an empty answer.
+func ensure(player_key: String, force: bool = false) -> DotResult:
+	if not force and not _stale(_cache.get(player_key, {})):
+		return DotResult.success(ids_of(player_key))
+	while _inflight.has(player_key):
+		await Engine.get_main_loop().process_frame
+	if not force and not _stale(_cache.get(player_key, {})):
+		return DotResult.success(ids_of(player_key))
+	return await refresh(player_key)
+
+
+## The next lookup reads again while the old answer still counts (a purchase made on the website).
+func mark_stale(player_key: String) -> void:
+	if _cache.has(player_key):
+		(_cache[player_key] as Dictionary)["stale"] = true
 
 
 func forget(player_key: String) -> void:

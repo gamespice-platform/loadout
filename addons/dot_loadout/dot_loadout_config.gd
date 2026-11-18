@@ -90,8 +90,8 @@ extends DotConfig
 @export var site_include_points: bool = true
 @export var site_include_loadout: bool = true
 
-## Take `grant.unlock` ids from items the token verified. TMC does not sign the grant itself.
-@export var site_unsigned_grants: bool = true
+## Also take the body's `grant.unlock` ids for items a v1 token verified (v1 does not sign the grant; v2 does).
+@export var site_unsigned_grants: bool = false
 
 ## Seconds between reads of the app's settings (store, avatars, stats); 0 reads once and stops.
 @export_range(0.0, 86400.0, 1.0, "or_greater") var site_settings_poll_sec: float = 60.0

@@ -16,5 +16,8 @@ extends RefCounted
 # 3: site tokens and TMC data: DotLoadoutSiteSource verifies the token (public_key, audience, verifier,
 #    verify_token, cloud_verify, from_config, points_of, loadout_of, rejected, refreshed, settings;
 #    layered's config argument); DotLoadoutSiteSettings; DotLoadoutConfig site_* and site_key().
-const LEVEL := 3
+# 4: DotLoadoutSiteSource reads v2 tokens (signed unlock ids, TOKEN_VERSION 2, OLDEST_TOKEN_VERSION),
+#    purchase() (POST store/purchase, PURCHASE_PATH), ingest(), ensure(), mark_stale(); unsigned_grants
+#    and DotLoadoutConfig.site_unsigned_grants now default to false.
+const LEVEL := 4
 const OLDEST := 1

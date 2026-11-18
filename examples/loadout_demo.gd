@@ -45,6 +45,7 @@ func _run() -> void:
 	await _test_free_by_default()
 	await _test_site_source()
 	await _test_site_source_ed25519()
+	await _test_site_v2_purchase()
 
 	DotPaths.remove_tree(LOADOUT_DIR)
 
@@ -71,6 +72,8 @@ func _test_site_source() -> void:
 	var site := FakeSite.new()
 	site.body = _site_body("p1", [["app", "skin.gold", null], ["app", "pack.heavy", null]], {"key": "skin.forged", "grant": {"unlock": "rifle_z"}})
 	var src := _signed_source(site)
+	_check(not src.unsigned_grants, "the unsigned grant.unlock is ignored by default")
+	src.unsigned_grants = true
 	src.source("p1")
 	_check(site.calls == 1, "the first lookup of a player starts a read")
 	_check(site.query.get("include") == "points,loadout", "the read asks for points and loadout", str(site.query))
@@ -255,14 +258,17 @@ func _signed_source(client: Object) -> DotLoadoutSiteSource:
 
 
 ## An entitlements answer shaped as TMC sends it, with a token for [param player].
-func _site_body(player: String, items: Array, extra_item: Dictionary = {}, ttl: int = 300, aud: String = "game-test") -> Dictionary:
+## [param version] 2 signs each item's unlock ids into the token.
+func _site_body(player: String, items: Array, extra_item: Dictionary = {}, ttl: int = 300, aud: String = "game-test", version: int = 1) -> Dictionary:
 	var now := int(Time.get_unix_time_from_system())
-	var payload := {"v": 1, "aud": aud, "sub": player, "iat": now, "exp": now + ttl, "items": items,
-		"points": 120, "loadout": [["primary", "app", "skin.gold"]]}
+	var signed: Array = []
 	var body_items: Array = []
 	for it: Array in items:
 		var grant: Variant = {"unlock": ["rifle_x", "smg_y"]} if it[1] == "pack.heavy" else null
 		body_items.append({"key": it[1], "kind": "WEAPON", "grant": grant, "expiresAt": it[2]})
+		signed.append(it + [grant["unlock"] if grant != null else []] if version >= 2 else it)
+	var payload := {"v": version, "aud": aud, "sub": player, "iat": now, "exp": now + ttl, "items": signed,
+		"points": 120, "loadout": [["primary", "app", "skin.gold"]]}
 	if not extra_item.is_empty():
 		body_items.append(extra_item)
 	var token := DotHash.base64url_encode_text(JSON.stringify(payload)) + "." + DotHash.base64url_encode("sig-ok".to_ascii_buffer())
@@ -287,3 +293,50 @@ class FakeSite:
 		last_path = path
 		query = p_query
 		return DotResult.success(body)
+
+	var post_body: Dictionary = {}
+	## Null answers [member body]; set a failure to stand for TMC refusing the purchase.
+	var post_result: DotResult = null
+
+	func post_integration(path: String, p_body: Dictionary) -> DotResult:
+		last_path = path
+		post_body = p_body
+		return post_result if post_result != null else DotResult.success(body)
+
+
+## v2 tokens sign the unlock ids; a purchase answer's token counts at once; a stale answer is read again.
+func _test_site_v2_purchase() -> void:
+	_section("site v2 tokens and purchases")
+	var site := FakeSite.new()
+	site.body = _site_body("p1", [["app", "pack.heavy", null]], {}, 300, "game-test", 2)
+	var src := _signed_source(site)
+	var res: DotResult = await src.refresh("p1")
+	_check(res.ok and src.source("p1").allows(_item_for("rifle_x")) and src.ids_of("p1").size() == 3, "a v2 token's signed unlock ids are granted with unsigned grants off", str(res.value))
+	site.body = _site_body("p1", [["app", "pack.heavy", null]], {}, 300, "game-test", 3)
+	res = await src.refresh("p1")
+	_check(not res.ok and res.code() == DotError.CODE_VERSION, "a token version newer than this addon reads is refused", str(res))
+	_check(not (await DotLoadoutSiteSource.new().purchase("p1", "item-7")).ok, "a purchase without post_integration fails")
+	site.body = _site_body("p1", [["app", "skin.gold", null], ["app", "skin.new", null]], {}, 300, "game-test", 2)
+	site.body["status"] = "purchased"
+	var calls := site.calls
+	res = await src.purchase("p1", "item-7", "k1")
+	_check(res.ok and (res.value as Dictionary).get("status") == "purchased" and src.ids_of("p1").has("skin.new"), "a purchase answer's token is applied at once", str(res))
+	_check(site.calls == calls and site.last_path == DotLoadoutSiteSource.PURCHASE_PATH
+		and site.post_body.get("player") == "p1" and site.post_body.get("itemId") == "item-7" and site.post_body.get("idemKey") == "k1",
+		"the purchase posts the player, item and idempotency key, with no extra read", str(site.post_body))
+	site.post_result = DotResult.fail(DotError.CODE_FORBIDDEN, "insufficient_points")
+	res = await src.purchase("p1", "item-8", "k2")
+	_check(not res.ok and src.ids_of("p1").has("skin.new"), "a refused purchase fails and keeps what the player owns", str(res))
+	site.post_result = null
+	await src.purchase("p1", "item-7")
+	_check(str(site.post_body.get("idemKey", "")) != "", "an empty idempotency key is made")
+	calls = site.calls
+	await src.ensure("p1")
+	_check(site.calls == calls, "ensure on a fresh answer starts no read")
+	src.mark_stale("p1")
+	_check(src.ids_of("p1").has("skin.new"), "a stale answer still counts until the next read")
+	await src.ensure("p1")
+	_check(site.calls == calls + 1, "ensure on a stale answer waits for a read")
+	await src.ensure("p1", true)
+	_check(site.calls == calls + 2, "ensure with force always reads")
+	_done()
