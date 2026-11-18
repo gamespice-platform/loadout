@@ -1,6 +1,6 @@
-extends "loadout_demo_f.gd"
+extends "loadout_demo_persistence.gd"
 
-## Suite part: random loadout at every spawn, and loadouts that are free unless a server prices them.
+## Suite section: random loadout at every spawn, and loadouts that are free unless a server prices them.
 
 const SPAWN_KEY := "player-spawn-0001"
 

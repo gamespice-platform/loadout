@@ -1,4 +1,4 @@
-extends "loadout_demo_d.gd"
+extends "loadout_demo_random.gd"
 
 ## Try-outs must not use up saved-loadout slots; named loadouts and their cap.
 

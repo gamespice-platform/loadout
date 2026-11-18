@@ -1,4 +1,4 @@
-extends "loadout_demo_g.gd"
+extends "loadout_demo_spawn_pricing.gd"
 
 ## Entry point of the offline suite; the checks live in loadout_demo_base.gd and the parts that extend it.
 

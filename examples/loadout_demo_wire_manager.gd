@@ -1,6 +1,6 @@
-extends "loadout_demo_a.gd"
+extends "loadout_demo_items_budgets.gd"
 
-## Suite part: wire, stores and the manager.
+## Suite section: wire, stores and the manager.
 
 # Wire
 

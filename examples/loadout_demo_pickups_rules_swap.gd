@@ -1,6 +1,6 @@
-extends "loadout_demo_b.gd"
+extends "loadout_demo_wire_manager.gd"
 
-## Suite part: pickups, rules, command and instant swap.
+## Suite section: pickups, rules, command and instant swap.
 
 
 # Pickups

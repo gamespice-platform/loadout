@@ -1,6 +1,6 @@
-extends "loadout_demo_c.gd"
+extends "loadout_demo_pickups_rules_swap.gd"
 
-## Suite part: the Random entry.
+## Suite section: the Random entry.
 
 const KEY := "player-rnd-0001"
 

@@ -1,6 +1,6 @@
 extends "loadout_demo_base.gd"
 
-## Suite part: items through budgets.
+## Suite section: items through budgets.
 
 # Items
 

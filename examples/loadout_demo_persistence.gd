@@ -1,4 +1,4 @@
-extends "loadout_demo_e.gd"
+extends "loadout_demo_saved.gd"
 
 ## Saved loadouts persist: a new store over the same directory gets them back.
 
