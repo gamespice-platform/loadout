@@ -1,4 +1,4 @@
-extends "loadout_demo_spawn_pricing.gd"
+extends "loadout_demo_site_keys.gd"
 
 ## Entry point of the offline suite; the checks live in loadout_demo_base.gd and the parts that extend it.
 
@@ -46,6 +46,7 @@ func _run() -> void:
 	await _test_site_source()
 	await _test_site_source_ed25519()
 	await _test_site_v2_purchase()
+	await _test_site_keys_follow()
 
 	DotPaths.remove_tree(LOADOUT_DIR)
 
@@ -140,7 +141,7 @@ func _test_site_token_rejection(site: FakeSite) -> DotLoadoutConfig:
 	var unpinned := DotLoadoutSiteSource.with_client(site)
 	site.body = _site_body("p2", [["app", "skin.gold", null]])
 	res = await unpinned.refresh("p2")
-	_check(not res.ok and res.code() == DotError.CODE_STATE and unpinned.ids_of("p2").is_empty(), "no pinned key refuses every token", str(res))
+	_check(not res.ok and res.code() == DotError.CODE_NETWORK and unpinned.ids_of("p2").is_empty(), "no pin and no readable key list refuses every token", str(res))
 	unpinned.public_key = "PINNED"
 	unpinned.audience = "game-test"
 	res = await unpinned.refresh("p2")
@@ -149,7 +150,7 @@ func _test_site_token_rejection(site: FakeSite) -> DotLoadoutConfig:
 	_check(not raw.ok, "cloud_verify fails loudly when it cannot verify", str(raw))
 	_check(why.size() == 6, "every rejection was signalled", str(why.size()))
 	var cfg := DotLoadoutConfig.new()
-	_check(not cfg.site_key().ok, "a config with no pinned key fails")
+	_check(cfg.site_key().ok and cfg.site_key().value == "" and not cfg.site_pinned(), "a config with no pin follows the site's key list")
 	cfg.site_public_key = "PINNED"
 	cfg.site_audience = "game-test"
 	_check(cfg.site_key().value == "PINNED", "site_public_key is the pinned key")
