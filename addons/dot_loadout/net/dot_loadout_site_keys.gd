@@ -104,6 +104,12 @@ static func parse(body: Variant) -> DotResult:
 func keys_for(kid: String) -> DotResult:
 	var now := _now()
 	var stale := _ok_at < 0.0 or (ttl_sec > 0.0 and now - _ok_at >= ttl_sec)
+	if _fetching:
+		# A read is already in flight (several players at once on a fresh server): wait for it, so a
+		# caller is never told "never been read" for a list that is arriving.
+		await fetch()
+		now = _now()
+		stale = _ok_at < 0.0 or (ttl_sec > 0.0 and now - _ok_at >= ttl_sec)
 	if (stale or (kid != "" and not _keys.has(kid))) and _may_read(now):
 		await fetch()
 		now = _now()

@@ -128,6 +128,7 @@ func _test_site_keys_grace(src: DotLoadoutSiteSource, site: KeySite, new_key: St
 	site.keys_result = null
 	_clock[0] += fresh.keys.refetch_min_sec + 1.0
 	_check((await fresh.refresh("p1")).ok, "once the site answers, the same server verifies")
+	_check(await _concurrent_first_read(), "players asking at once on a fresh server share one read and all verify")
 	var lab := DotLoadoutSiteKeys.with_client(site)
 	site.config = AuthCfg.new()
 	site.config.backbone_url = "http://example.test"
@@ -169,6 +170,28 @@ func _test_site_keys_pinned(site: KeySite, old_key: String, new_key: String) -> 
 	res = await src.refresh("p1")
 	_check(not res.ok and src.audience == "", "a pinned server does not take its audience from the site", str(res))
 	_done()
+
+
+## Three callers hit a fresh server while the first key read is still in flight: none may be told the list was never read.
+func _concurrent_first_read() -> bool:
+	var key := DotHash.base64url_encode(DotHash.random_bytes(32))
+	var site := KeySite.new()
+	site.keys_body = _key_list([key])
+	site.delay_frames = 3
+	var keys := DotLoadoutSiteKeys.with_client(site)
+	keys.now_fn = func() -> float: return _clock[0]
+	var results: Array = []
+	var run := func() -> void:
+		results.append(await keys.keys_for(""))
+	run.call()
+	run.call()
+	run.call()
+	while results.size() < 3:
+		await Engine.get_main_loop().process_frame
+	var all_ok := true
+	for r: DotResult in results:
+		all_ok = all_ok and r.ok
+	return all_ok and site.reads("store/keys") == 1
 
 
 func _follow(src: DotLoadoutSiteSource) -> void:
@@ -220,12 +243,15 @@ class KeySite:
 	var keys_result: DotResult = null
 	var me_body: Dictionary = {}
 	var _reads: Dictionary = {}
+	var delay_frames: int = 0
 
 	func reads(path: String) -> int:
 		return int(_reads.get(path, 0))
 
 	func get_integration(path: String, _query: Dictionary = {}) -> DotResult:
 		_reads[path] = reads(path) + 1
+		for _i in delay_frames:
+			await Engine.get_main_loop().process_frame
 		if path == DotLoadoutSiteKeys.PATH:
 			return keys_result if keys_result != null else DotResult.success(keys_body)
 		if path == DotLoadoutSiteSource.ME_PATH:
