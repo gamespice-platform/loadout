@@ -1,3 +1,5 @@
+[![dot-loadout - GameSpice addon](docs/banner.png)](https://moddingcommunity.com/a/208-dot-loadout)
+
 What a player takes into a match, as a small document a dedicated server can validate against a schema and the player's entitlements without loading any game content. Also items, slots, optional budgets, stores and deterministic world pickups.
 
 Part of the [**Gamespice**](https://gamespice.net) collection: modular, MIT-licensed building blocks for games on the Gamespice platform (only the TMC website back end is closed). It was built with Claude Code and its headless suite passes, but little of it has met real players yet, so expect rough edges and please report what you find.
