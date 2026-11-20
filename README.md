@@ -1,4 +1,4 @@
-[![Loadout - GameSpice addon](docs/banner.png)](https://moddingcommunity.com/a/208-dot-loadout)
+[![Loadout - GameSpice addon](docs/banner.png)](https://moddingcommunity.com/a/22-gs-loadout)
 
 What a player takes into a match, as a small document a dedicated server can validate against a schema and the player's entitlements without loading any game content. Also items, slots, optional budgets, stores and deterministic world pickups.
 
