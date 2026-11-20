@@ -12,7 +12,7 @@ extends RefCounted
 ## flag is for, and it is how a starting pistol works without a grant.
 ##
 ## The same shape as [code]DotAvatarEntitlements[/code], and deliberately a separate
-## class: only dot-core is a hard dependency in this family, and a game that wants
+## class: only GameSpice Core is a hard dependency in this family, and a game that wants
 ## loadouts without avatars must not have to install one to get the other.
 
 var _held: Dictionary = {}

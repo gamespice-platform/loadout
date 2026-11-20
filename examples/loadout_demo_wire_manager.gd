@@ -4,7 +4,7 @@ extends "loadout_demo_items_budgets.gd"
 
 # Wire
 
-## A stand-in for a DotNetWriter. dot-loadout never names one — see [DotLoadout.write].
+## A stand-in for a DotNetWriter. GameSpice Loadout never names one — see [DotLoadout.write].
 class FakeWriter extends RefCounted:
 	var parts: Array = []
 
@@ -204,7 +204,7 @@ func _test_manager() -> void:
 
 	await _check_manager_failures(key)
 
-	# resolve() gives a game the slot-to-item mapping without importing dot-combat.
+	# resolve() gives a game the slot-to-item mapping without importing GameSpice Combat.
 	var mapped := manager.resolve(_full_loadout())
 	_check(mapped.size() == 3, "resolve maps every filled slot")
 	_check(int(mapped[0]["arsenal_slot"]) == 1, "carrying the arsenal slot hint")

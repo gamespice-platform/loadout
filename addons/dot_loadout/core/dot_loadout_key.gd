@@ -3,12 +3,12 @@ extends RefCounted
 
 ## What a loadout may be keyed by, and how that string is checked.
 ##
-## Loadouts are stored per player under the [b]scoped[/b] id dot-user derives, never
-## an account id — the same rule dot-user-avatar follows, for the same reason: a file
+## Loadouts are stored per player under the [b]scoped[/b] id GameSpice User derives, never
+## an account id — the same rule GameSpice User Avatar follows, for the same reason: a file
 ## named after an account id lets two operators correlate their players by comparing
 ## directory listings.
 ##
-## [b]This is a copy of dot-user-avatar's check, not a reuse of it.[/b] Only dot-core
+## [b]This is a copy of GameSpice User Avatar's check, not a reuse of it.[/b] Only GameSpice Core
 ## is a hard dependency in this family, and a game that wants loadouts without avatars
 ## must not have to install one to get the other. Do not "deduplicate" it.
 ##

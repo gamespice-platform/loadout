@@ -90,7 +90,7 @@ func ids() -> Array[StringName]:
 ## Download every pack this catalogue's items live in.
 ##
 ## [b]Nothing used to fetch these.[/b] [DotItem] has carried a `content_id` and a
-## fallback for it since it was written, and no code anywhere asked dot-cloud for one —
+## fallback for it since it was written, and no code anywhere asked GameSpice Cloud for one —
 ## so a delivered item resolved to its fallback for the life of the process, which is
 ## the designed behaviour for content that has not arrived and therefore says nothing
 ## about content that never will.

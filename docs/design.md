@@ -1,4 +1,4 @@
-# dot-loadout design
+# GameSpice Loadout design
 
 Why the addon is shaped the way it is, and why the obvious alternative is wrong at each point. The rules this produces are one line each in [CLAUDE.md](../CLAUDE.md).
 
@@ -87,24 +87,24 @@ Reach is a distance test, not an `Area3D` overlap, and it is a horizontal distan
 
 ## `DotLoadoutKey` is a copy, deliberately
 
-It duplicates dot-user-avatar's `DotAvatarKey.is_usable`. Do not deduplicate it. Only dot-core is a hard dependency in this family, and a game that wants loadouts without avatars must not have to install one to get the other: the same reason dot-user-avatar carries its own rather than reusing dot-user's.
+It duplicates GameSpice User Avatar's `DotAvatarKey.is_usable`. Do not deduplicate it. Only GameSpice Core is a hard dependency in this family, and a game that wants loadouts without avatars must not have to install one to get the other: the same reason GameSpice User Avatar carries its own rather than reusing GameSpice User's.
 
 ## Coupling: nothing is imported
 
-dot-loadout names no class outside dot-core in code. Not dot-combat, not dot-net, not dot-weapon, not dot-server.
+GameSpice Loadout names no class outside GameSpice Core in code. Not GameSpice Combat, not GameSpice Net, not GameSpice Weapon, not GameSpice Server.
 
-- `DotLoadout.write` / `read` take `Variant` (a `DotNetWriter` / `DotNetReader` in practice), so this project parses without dot-net installed. Inside `read`, the locals are typed rather than inferred: `var x := reader.read_string(...)` is a parse error under these projects' warning settings because a `Variant` return cannot be inferred.
+- `DotLoadout.write` / `read` take `Variant` (a `DotNetWriter` / `DotNetReader` in practice), so this project parses without GameSpice Net installed. Inside `read`, the locals are typed rather than inferred: `var x := reader.read_string(...)` is a parse error under these projects' warning settings because a `Variant` return cannot be inferred.
 - Ids go on the wire as strings, not indices into the schema. Indices are smaller and they are a version coupling: a schema that gains a slot renumbers every one after it, and two peers on different builds then decode each other's loadouts into the wrong slots without anything failing. A loadout is sent once per player per life, so the size does not matter.
-- `DotLoadoutSlot.arsenal_slot` is a plain integer a game matches against a weapon's own slot (`DotWeaponDef.slot`). dot-loadout never names dot-weapon.
-- `DotLoadoutManager.resolve` returns `{slot, arsenal_slot, item, count}` dictionaries rather than doing anything with them. dot-weapon's `DotWeaponLoadoutBridge` consumes exactly that shape, duck-typed, so neither addon depends on the other.
+- `DotLoadoutSlot.arsenal_slot` is a plain integer a game matches against a weapon's own slot (`DotWeaponDef.slot`). GameSpice Loadout never names GameSpice Weapon.
+- `DotLoadoutManager.resolve` returns `{slot, arsenal_slot, item, count}` dictionaries rather than doing anything with them. GameSpice Weapon's `DotWeaponLoadoutBridge` consumes exactly that shape, duck-typed, so neither addon depends on the other.
 
 ## No backbone store yet, and why
 
 `DotLoadoutStore` has the seam, but there is no `DotLoadoutStoreBackbone` and website-city has no loadout route. Decided 2026-10-11 (nightly `user-profile-routes-1`): a route now would be speculative, because nothing could call it and nothing would use it if something could.
 
-- **There is no client.** This addon ships no HTTP store, so a site route would have no caller; dot-user and dot-user-avatar each ship their backbone store first and the site serves what that store sends.
+- **There is no client.** This addon ships no HTTP store, so a site route would have no caller; GameSpice User and GameSpice User Avatar each ship their backbone store first and the site serves what that store sends.
 - **No game keeps loadouts past a session.** game-fatal-contact, game-airdrift, game-hungario and game-playlot all build `DotLoadoutStoreMemory` on purpose (hungario's module says why: a loadout that outlives a session is a profile).
-- **Games key loadouts by session, not by player.** Playlot publishes under `"u%d" % session_id` and hungario under `"hungry-%08d" % player_id`. A backbone store resolves only the site's scoped key (dot-auth's `scoped_key` claim), so under today's keys every fetch would be a 404 and every save would fail.
+- **Games key loadouts by session, not by player.** Playlot publishes under `"u%d" % session_id` and hungario under `"hungry-%08d" % player_id`. A backbone store resolves only the site's scoped key (GameSpice Auth's `scoped_key` claim), so under today's keys every fetch would be a 404 and every save would fail.
 
 Build it when a game wants loadouts to follow a player between servers: that game first keys loadouts by the scoped key, then this addon gains `DotLoadoutStoreBackbone` (shaped like dot-user's, including its parented `DotHttp`, see dot-user's docs/design.md "The backbone protocol") and website-city gains `user/{key}/loadouts` beside `user/{key}/profile`, stored per `UserScopeKey` like `UserScopeProfile`.
 
@@ -125,19 +125,19 @@ The menu's Random entry (`DotLoadoutRandom`, `/loadout random`) rolls a fresh se
 
 ## The menu's server half
 
-`DotLoadoutCommand` is the wire, the same shape as dot-vote's map menu: the client sends `/loadout` through its chat link (a prefixed line is a command and is never shown), the server answers with a `loadout_menu` notice carrying `DotLoadoutManager.offer_for` (`{choose, budget, points, note, slots: [{id, name, required, fixed, current, choices: [{id, name, cost, tags}]}]}`), and a choice is `/loadout slot=item ...`, published through the trust boundary. A hostile client typing the line gets exactly what the screen would have let it pick. The offer is ids, names and numbers only: art and statistics are the client's, from its own content, because a dedicated server may have none. `closed_fn` lets the game close the menu for a reason of its own (a mode that hands out the weapons): the offer then lets nothing be picked and says why, and a choice is refused with the same words. `applied_fn` lets the game hand the new loadout over at once (warmup, spawn protection) and say so; otherwise it is the next spawn. Nothing here names dot-server: the host is anything with `add_command`/`add_cvar`, the notice script is loaded by path.
+`DotLoadoutCommand` is the wire, the same shape as GameSpice Vote's map menu: the client sends `/loadout` through its chat link (a prefixed line is a command and is never shown), the server answers with a `loadout_menu` notice carrying `DotLoadoutManager.offer_for` (`{choose, budget, points, note, slots: [{id, name, required, fixed, current, choices: [{id, name, cost, tags}]}]}`), and a choice is `/loadout slot=item ...`, published through the trust boundary. A hostile client typing the line gets exactly what the screen would have let it pick. The offer is ids, names and numbers only: art and statistics are the client's, from its own content, because a dedicated server may have none. `closed_fn` lets the game close the menu for a reason of its own (a mode that hands out the weapons): the offer then lets nothing be picked and says why, and a choice is refused with the same words. `applied_fn` lets the game hand the new loadout over at once (warmup, spawn protection) and say so; otherwise it is the next spawn. Nothing here names GameSpice Server: the host is anything with `add_command`/`add_cvar`, the notice script is loaded by path.
 
 `offer_for(key, true)` also lists items the player does not own, each choice gaining `locked` and `store` (the manager's `store_url`); `request_store(item)` emits `store_requested(item, url)` for a menu's "Get in store" button. Default offers are unchanged and publish still refuses locked items.
 
 ## Saved loadouts and the website (design only, not built)
 
-A player keeps named loadouts (`mp_loadout_max_saved`, 0 unlimited) under the key the game gives; `/loadout save|use|rename|delete` manage them and `selected` survives restarts. Guests are stored by `DotLoadoutStoreLocal` in `user://`. Editing them on the website needs the backbone to add `GET/PUT user/{key}/loadouts` beside `user/{key}/profile` (profile preferences hold 32 keys of 256 characters, too small), keyed by the scoped user key, a size limit for 256 loadouts, and a store that reads and writes it (a callable-backed `DotLoadoutStore`, since this addon names nothing outside dot-core). The server still validates every loadout on use.
+A player keeps named loadouts (`mp_loadout_max_saved`, 0 unlimited) under the key the game gives; `/loadout save|use|rename|delete` manage them and `selected` survives restarts. Guests are stored by `DotLoadoutStoreLocal` in `user://`. Editing them on the website needs the backbone to add `GET/PUT user/{key}/loadouts` beside `user/{key}/profile` (profile preferences hold 32 keys of 256 characters, too small), keyed by the scoped user key, a size limit for 256 loadouts, and a store that reads and writes it (a callable-backed `DotLoadoutStore`, since this addon names nothing outside GameSpice Core). The server still validates every loadout on use.
 
 ## Deliberately not here
 
-- **A loadout screen.** It is dot-menu's (`DotMenuLoadout`, on B), which reads the offer above and names nothing of this addon's; `DotLoadoutSchema.choices_for` deliberately returns what a player can actually take rather than everything a slot accepts, because a screen that shows the second and refuses on submit is a screen that lies.
-- **Item to weapon mapping.** `arsenal_slot` is the hint; `DotWeaponLoadoutBridge` in dot-weapon is the table, because importing dot-weapon here would make loadouts unavailable to a game that does not use it.
+- **A loadout screen.** It is GameSpice Menu's (`DotMenuLoadout`, on B), which reads the offer above and names nothing of this addon's; `DotLoadoutSchema.choices_for` deliberately returns what a player can actually take rather than everything a slot accepts, because a screen that shows the second and refuses on submit is a screen that lies.
+- **Item to weapon mapping.** `arsenal_slot` is the hint; `DotWeaponLoadoutBridge` in GameSpice Weapon is the table, because importing GameSpice Weapon here would make loadouts unavailable to a game that does not use it.
 - **Buying, currency, a shop.** Entitlements arrive from somewhere; `entitlement_source` is the whole seam.
 - **Attachments and modifications.** A scope, a barrel and a stock on one weapon is a nested document with its own budget, a genuinely different shape from a flat slot map. Doing it badly now would be harder to undo than adding it later.
 - **Per-team or per-class schemas.** One manager holds one schema. A game with two runs two managers, or swaps `schema` between rounds. Making the manager hold a set keyed by something would guess at what that something is.
-- **Dropping and picking up a carried weapon.** `DotPickup` grants an item; nothing spawns one from a player's current arsenal on death. That needs an item's runtime state (its remaining ammunition), which is dot-weapon's `DotWeaponSlot`.
+- **Dropping and picking up a carried weapon.** `DotPickup` grants an item; nothing spawns one from a player's current arsenal on death. That needs an item's runtime state (its remaining ammunition), which is GameSpice Weapon's `DotWeaponSlot`.

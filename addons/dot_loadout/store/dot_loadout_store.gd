@@ -3,8 +3,8 @@ extends RefCounted
 
 ## Where saved loadouts live, keyed by the player's scoped id.
 ##
-## The same shape and the same two rules as dot-user's profile store and
-## dot-user-avatar's, because it is the same problem: a per-player record a community
+## The same shape and the same two rules as GameSpice User's profile store and
+## GameSpice User Avatar's, because it is the same problem: a per-player record a community
 ## running several servers wants to share. Loads may be slow and lookups on the join
 ## path may not; a failed read keeps whatever is in force rather than replacing it
 ## with a blank.

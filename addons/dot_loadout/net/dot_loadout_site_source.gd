@@ -12,7 +12,7 @@ signal refreshed(player_key: String)
 
 const CHANNEL := "loadout.site"
 const PATH := "store/entitlements"
-## dot-cloud's verifier, loaded by path so a game without dot-cloud still runs (and refuses every token).
+## GameSpice Cloud's verifier, loaded by path so a game without GameSpice Cloud still runs (and refuses every token).
 const CLOUD_SIGNATURE := "res://addons/dot_cloud/verify/dot_cloud_signature.gd"
 ## The newest token version read; 2 signs each item's unlock ids, 1 signs only the item keys.
 const TOKEN_VERSION := 2
@@ -172,7 +172,7 @@ static func verify_token_any(
 	return DotResult.success(p)
 
 
-## The default verifier: dot-cloud's signature check. An RSA PEM key uses its RSA-SHA256 `verify`;
+## The default verifier: GameSpice Cloud's signature check. An RSA PEM key uses its RSA-SHA256 `verify`;
 ## a raw Ed25519 key needs its `verify_ed25519(bytes, signature, key_bytes)`, and fails loudly without.
 static func cloud_verify(bytes: PackedByteArray, signature: PackedByteArray, key: String) -> DotResult:
 	if not ResourceLoader.exists(CLOUD_SIGNATURE):

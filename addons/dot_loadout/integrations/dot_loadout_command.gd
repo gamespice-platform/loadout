@@ -20,12 +20,12 @@ extends RefCounted
 ## `/loadout primary=rifle secondary=pistol ...`, which goes through
 ## [method DotLoadoutManager.publish] (the trust boundary: a hostile client typing the line gets
 ## exactly what the screen would have let it pick), and the result comes back as a notice too.
-## No game needs a message type of its own, and every game on a dot-server has the same wire.
+## No game needs a message type of its own, and every game on a GameSpice Server has the same wire.
 ##
-## [b]Nothing here names dot-server.[/b] The host is any object with `add_command(name, handler,
+## [b]Nothing here names GameSpice Server.[/b] The host is any object with `add_command(name, handler,
 ## description, permission)` and `add_cvar(name, default, description, flags)`; a command context
 ## is read for `args`, `session`, `reply` and `reply_lines`; the notice script is loaded by path and
-## the server found as `dot_server` in [DotRegistry], as dot-vote's map menu does.
+## the server found as `dot_server` in [DotRegistry], as GameSpice Vote's map menu does.
 
 const CHANNEL := "loadout.command"
 
@@ -35,7 +35,7 @@ const COMMAND := "loadout"
 
 const NOTICE_SCRIPT := "res://addons/dot_server/net/dot_notice.gd"
 
-## dot-server's `DotConVar.FLAG_ARCHIVE | FLAG_NOTIFY`, by value: an owner's choice is saved, and a
+## GameSpice Server's `DotConVar.FLAG_ARCHIVE | FLAG_NOTIFY`, by value: an owner's choice is saved, and a
 ## change is said in chat.
 ## The first words of the saved-loadout subcommands.
 const SAVED_WORDS: Array[String] = ["save", "use", "rename", "delete"]
@@ -60,7 +60,7 @@ var applied_fn: Callable = Callable()
 var closed_fn: Callable = Callable()
 
 ## `func(ctx: Object, data: Dictionary) -> bool`: send [param data] to the player as a
-## [constant TOPIC] notice. Unset uses dot-server's, found by path; a suite sets its own.
+## [constant TOPIC] notice. Unset uses GameSpice Server's, found by path; a suite sets its own.
 var notice_fn: Callable = Callable()
 
 ## The instant-swap rule ([DotLoadoutInstantSwap]); off until a game enables it.

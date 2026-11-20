@@ -7,7 +7,7 @@ extends RefCounted
 ## meshes, no weapon resources. A dedicated server can receive one from an untrusted
 ## client, validate it against a schema and a set of entitlements, and hand it to the
 ## game — **without loading any content at all**, which is the same trade
-## dot-user-avatar makes for the same reason.
+## GameSpice User Avatar makes for the same reason.
 ##
 ## Bounded on purpose: [constant MAX_SLOTS] entries, and every id is length-limited on
 ## the wire. A document a client can make arbitrarily large is a document a client can
@@ -254,8 +254,8 @@ func to_json() -> String:
 
 ## Writes to a [code]DotNetWriter[/code].
 ##
-## [param writer] is [Variant] so this file never mentions a dot-net class name — a
-## script that does fails to parse in a project without dot-net installed, and takes
+## [param writer] is [Variant] so this file never mentions a GameSpice Net class name — a
+## script that does fails to parse in a project without GameSpice Net installed, and takes
 ## every script that references it down with it.
 ##
 ## Slot and item ids go on the wire as strings rather than as indices into the schema.
@@ -296,7 +296,7 @@ static func read(reader: Variant) -> DotResult:
 		)
 
 	for _index in range(count):
-		# Typed, not inferred: `reader` is Variant so this file never names a dot-net
+		# Typed, not inferred: `reader` is Variant so this file never names a GameSpice Net
 		# class, and `var x := f()` where f returns Variant is a parse error under
 		# these projects' warning settings.
 		var slot: String = reader.read_string(MAX_ID_BYTES)

@@ -1,10 +1,10 @@
-# dot-loadout
+# GameSpice Loadout
 
 What a player takes into a match: a schema of slots, a catalogue of items, saved loadouts per player, entitlements, and deterministic world pickups. A loadout is a document of ids, so a dedicated server with no content can still decide whether one is legal.
 
 Read the family [CLAUDE.md](../../CLAUDE.md) first.
 
-**The distributable is `addons/dot_loadout/`.** It requires [dot-core](../dot-core) and nothing else (`ln -s ../../dot-core/addons/dot_core addons/dot_core`, gitignored); `DotLoadoutSiteSource` loads dot-cloud's signature verifier by path when it is installed, and without it refuses every site token. It names no class outside dot-core in code; dot-weapon's `DotWeaponLoadoutBridge` consumes `DotLoadoutManager.resolve`'s output by duck typing.
+**The distributable is `addons/dot_loadout/`.** It requires [GameSpice Core](../dot-core) and nothing else (`ln -s ../../dot-core/addons/dot_core addons/dot_core`, gitignored); `DotLoadoutSiteSource` loads dot-cloud's signature verifier by path when it is installed, and without it refuses every site token. It names no class outside dot-core in code; dot-weapon's `DotWeaponLoadoutBridge` consumes `DotLoadoutManager.resolve`'s output by duck typing.
 
 ## Read before
 
@@ -47,7 +47,7 @@ The family's two steps ([family CLAUDE.md](../../CLAUDE.md#validating-anything))
 - A refused publish still spends a rate-limit token; a failed store write never updates the cache. [design](docs/design.md#the-trust-boundary-is-dotloadoutmanagerpublish)
 - The first publish with no index replaces the synthesised default (`_synthesised`), it does not append. [design](docs/design.md#the-synthesised-default-is-an-edit-target-not-a-saved-loadout)
 - A choice (`publish_selected`, what the command uses) edits the selected loadout; only `save_as` (`/loadout save NAME`) adds one. `mp_loadout_max_saved` caps how many (0 unlimited, store bound 256) and the refusal names it; the selection is kept in the stored loadout (`selected`). Names: `DotLoadoutNames`.
-- `DotLoadoutStoreLocal` writes `{version, loadouts}` atomically; a file that will not parse, is over `mp_loadout_store_max_bytes` or is malformed is renamed `.corrupt` and reads as "no loadouts" (never deleted); a newer `version` is refused and left alone; a new player past `mp_loadout_store_max_files` is refused with `CODE_QUOTA`. A `:` in a key is `~` in the filename. A game keys by a stable per-server key (dot-game `DotGameStatsFeed.key_for`) and wraps the store in `DotLoadoutStoreTiered` so session-keyed seats stay in memory.
+- `DotLoadoutStoreLocal` writes `{version, loadouts}` atomically; a file that will not parse, is over `mp_loadout_store_max_bytes` or is malformed is renamed `.corrupt` and reads as "no loadouts" (never deleted); a newer `version` is refused and left alone; a new player past `mp_loadout_store_max_files` is refused with `CODE_QUOTA`. A `:` in a key is `~` in the filename. A game keys by a stable per-server key (GameSpice Game `DotGameStatsFeed.key_for`) and wraps the store in `DotLoadoutStoreTiered` so session-keyed seats stay in memory.
 - Entitlements default to nothing: an unwired server permits only `DotItem.free`. [design](docs/design.md#entitlements-default-to-nothing)
 - A site answer without a token that verifies against a key from the site's published list (or the strict pin) grants nothing; a key is never taken from the answer it verifies, and an unreadable list past `site_keys_grace_sec` grants nothing and logs an error; never add a path that trusts the unsigned body. [design](docs/design.md#site-tokens)
 - Retire an item (`DotItem.retired`), never delete it from the catalogue. [design](docs/design.md#retired-is-not-deleted)
@@ -56,11 +56,11 @@ The family's two steps ([family CLAUDE.md](../../CLAUDE.md#validating-anything))
 - Lists of ids (`filled_slots`, `to_list`, `ids`) sort **by text** with `sort_custom`, never `sort()`: StringNames sort by interning, which differs per process, and `digest()` depends on it. [gdscript-hazards](../../docs/gdscript-hazards.md)
 - A server owner's rules (`DotLoadoutRules`, `mp_loadout_menu` / `_allow` / `_fixed`) are applied on the way out (`active_for` hands back a conformed copy), never written into a stored loadout; a cvar value `check()` refuses keeps the old rules. [design](docs/design.md#a-server-owners-rules)
 - Fixed slots are the owner's: never entitlement-checked, never trimmed by a budget, and overwritten (not judged) in a publish. [design](docs/design.md#a-server-owners-rules)
-- The menu's wire is `DotLoadoutCommand`: `/loadout` answered by a `loadout_menu` notice, `/loadout slot=item ...` through `publish`; names no dot-server class. [design](docs/design.md#the-menus-server-half)
+- The menu's wire is `DotLoadoutCommand`: `/loadout` answered by a `loadout_menu` notice, `/loadout slot=item ...` through `publish`; names no GameSpice Server class. [design](docs/design.md#the-menus-server-half)
 - Name no class outside dot-core; `write`/`read` take `Variant` and type their locals explicitly. Ids go on the wire as strings, never schema indices. [design](docs/design.md#coupling-nothing-is-imported)
 
 ## Open
 
 - **No backbone store, by decision (2026-10-11).** No client exists, every game uses the memory store, and games key loadouts by session id, which no backbone can resolve; so there is no website-city loadout route either. What would have to change first, and the shape to build: [design](docs/design.md#no-backbone-store-yet-and-why).
 
-The screen itself is dot-menu's (`DotMenuLoadout`, B). Deliberately not here: buying or a shop, attachments, per-team schemas, dropping a carried weapon. [design](docs/design.md#deliberately-not-here)
+The screen itself is GameSpice Menu's (`DotMenuLoadout`, B). Deliberately not here: buying or a shop, attachments, per-team schemas, dropping a carried weapon. [design](docs/design.md#deliberately-not-here)

@@ -37,7 +37,7 @@ extends Resource
 
 ## The 1-based arsenal slot this maps to, for a slot holding a weapon.
 ##
-## Zero means this slot is not a weapon slot. dot-loadout never imports dot-combat;
+## Zero means this slot is not a weapon slot. GameSpice Loadout never imports GameSpice Combat;
 ## this is a number a game matches against `DotWeaponDef.slot`.
 @export_range(0, 16, 1) var arsenal_slot: int = 0
 

@@ -201,8 +201,8 @@ func _test_site_app_settings(cfg: DotLoadoutConfig) -> void:
 
 
 ## A source pinned to "PINNED" for audience "game-test", with a verifier that accepts the "sig-ok" signature.
-## One token signed by an independent Ed25519 implementation, checked through dot-cloud's verifier
-## with no stand-in verifier. It skips (and says so) where dot-cloud, or a dot-cloud with verify_ed25519, is not beside this addon.
+## One token signed by an independent Ed25519 implementation, checked through GameSpice Cloud's verifier
+## with no stand-in verifier. It skips (and says so) where GameSpice Cloud, or a GameSpice Cloud with verify_ed25519, is not beside this addon.
 const ED25519_SITE_KEY := "85Z3S4z-hQJcLBXdopf0QbpShS7IyO8RPSLuHZaOSwA"
 const ED25519_SITE_TOKEN := "eyJ2IjogMSwgImF1ZCI6ICJnYW1lLXRlc3QiLCAic3ViIjogInAxIiwgImlhdCI6IDE3MDAwMDAwMDAsICJleHAiOiA0MTAyNDQ0ODAwLCAiaXRlbXMiOiBbWyJhcHAiLCAic2tpbi5nb2xkIiwgbnVsbF1dLCAicG9pbnRzIjogMTIwLCAibG9hZG91dCI6IFtbInByaW1hcnkiLCAiYXBwIiwgInNraW4uZ29sZCJdXX0.6gt575erZsThmaQFQuOzW7s4-0ngNT9RaVE-DK5AFtISCXjnGdiQ3FWsRMlKbtFGgqhxJqdjDjXrj3SYEFmYAw"
 

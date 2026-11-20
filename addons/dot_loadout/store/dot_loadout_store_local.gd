@@ -3,7 +3,7 @@ extends DotLoadoutStore
 
 ## Loadouts as JSON files under a directory. The default, and it works unconfigured.
 ##
-## One file per player, for the reason dot-user's profile store gives: a single file
+## One file per player, for the reason GameSpice User's profile store gives: a single file
 ## is rewritten in full on every change and loses everything rather than one record
 ## when a write is interrupted. The file carries a schema [constant VERSION]; a file this
 ## build cannot read is set aside as `.corrupt` (never deleted), so one bad file costs that

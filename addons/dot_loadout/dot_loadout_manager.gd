@@ -615,7 +615,7 @@ func saved_list(user_key: String) -> Array[Dictionary]:
 	return out
 
 
-## DEBUG, as dot-inventory does: on an authoritative server a refusal is the rules being
+## DEBUG, as GameSpice Inventory does: on an authoritative server a refusal is the rules being
 ## enforced, and WARN would fill the log with the sound of the system working.
 func _refuse(user_key: String, reason: String) -> DotResult:
 	DotLog.debug(CHANNEL, "loadout refused", {"key": user_key, "reason": reason})
@@ -627,9 +627,9 @@ func _refuse(user_key: String, reason: String) -> DotResult:
 
 ## Turns a loadout into `[slot, item]` pairs a game can act on, in schema order.
 ##
-## Deliberately not "give these to an arsenal": dot-loadout does not import dot-weapon,
+## Deliberately not "give these to an arsenal": GameSpice Loadout does not import GameSpice Weapon,
 ## and a game that maps items to weapons does so with its own table. The `arsenal_slot`
-## on each [DotLoadoutSlot] is the hint that makes that table small, and dot-weapon
+## on each [DotLoadoutSlot] is the hint that makes that table small, and GameSpice Weapon
 ## ships a `DotWeaponLoadoutBridge` that consumes exactly what this returns.
 func resolve(loadout: DotLoadout) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []

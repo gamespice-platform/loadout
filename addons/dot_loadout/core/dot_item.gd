@@ -4,17 +4,17 @@ extends Resource
 
 ## One thing a player can be given, carry or wear into a match.
 ##
-## [b]Deliberately not a weapon.[/b] A weapon is a `DotWeaponDef` in dot-weapon, which
-## dot-loadout does not import — an item names one by id and something else resolves
+## [b]Deliberately not a weapon.[/b] A weapon is a `DotWeaponDef` in GameSpice Weapon, which
+## GameSpice Loadout does not import — an item names one by id and something else resolves
 ## it. That is what makes a loadout a document a server can validate without loading a
-## mesh, a scene or a weapon resource, which is the same trade dot-user-avatar makes
+## mesh, a scene or a weapon resource, which is the same trade GameSpice User Avatar makes
 ## and for the same reason: **the thing a client sends must be checkable by a machine
 ## that has none of the content.**
 
 ## What this is, so a slot can say what it accepts.
 ##
 ## Not exhaustive, and not an enum for the reason [DotHitGroup] is not one: a game
-## with a deployable, a vehicle key or a spell has a kind dot-loadout has never heard
+## with a deployable, a vehicle key or a spell has a kind GameSpice Loadout has never heard
 ## of, and an enum would make adding one a fork.
 const KIND_WEAPON := &"weapon"
 const KIND_EQUIPMENT := &"equipment"
@@ -70,7 +70,7 @@ const KIND_PERK := &"perk"
 ## into an error rather than into a slightly different gun.
 @export var retired: bool = false
 
-## Content this needs before it can be used, for dot-cloud. An id, not a path.
+## Content this needs before it can be used, for GameSpice Cloud. An id, not a path.
 @export var content_id: String = ""
 
 ## Used when [member content_id] is not available yet. Must itself be available.
