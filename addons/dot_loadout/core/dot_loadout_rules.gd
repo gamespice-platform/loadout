@@ -1,4 +1,4 @@
-class_name DotLoadoutRules
+class_name GSLoadoutRules
 extends RefCounted
 
 ## What a server owner lets players carry: whether they choose at all, which items each slot
@@ -6,9 +6,9 @@ extends RefCounted
 ##
 ## [codeblock]
 ## # Snipers only: the primary is any scoped weapon, everything else as usual.
-## var rules: DotLoadoutRules = DotLoadoutRules.parse(true, "primary=tag:scoped", "").value
+## var rules: GSLoadoutRules = GSLoadoutRules.parse(true, "primary=tag:scoped", "").value
 ## # Everybody gets the same kit and nobody chooses.
-## var locked: DotLoadoutRules = DotLoadoutRules.parse(false, "",
+## var locked: GSLoadoutRules = GSLoadoutRules.parse(false, "",
 ## 	"primary=marksman secondary=pistol melee=knife thrown=frag").value
 ## manager.rules = rules
 ## [/codeblock]
@@ -35,10 +35,10 @@ extends RefCounted
 ## mp_loadout_menu 0                                     # nobody chooses: defaults and fixed only
 ## [/codeblock]
 
-# No log channel: parsed rules and answers. The manager and DotLoadoutCommand, which know whose
+# No log channel: parsed rules and answers. The manager and GSLoadoutCommand, which know whose
 # loadout it is and which cvar said so, log.
 
-## The cvars every game with a loadout menu registers, through [DotLoadoutCommand] or by hand.
+## The cvars every game with a loadout menu registers, through [GSLoadoutCommand] or by hand.
 const CVAR_MENU := "mp_loadout_menu"
 const CVAR_ALLOW := "mp_loadout_allow"
 const CVAR_FIXED := "mp_loadout_fixed"
@@ -72,13 +72,13 @@ var point_budget: int = 0
 
 
 ## No restriction: players choose anything the schema and their entitlements allow.
-static func open() -> DotLoadoutRules:
-	return DotLoadoutRules.new()
+static func open() -> GSLoadoutRules:
+	return GSLoadoutRules.new()
 
 
 ## Rules from the three cvars' values. Fails, naming the entry, on text it cannot read; the
 ## caller keeps the rules it had (a typo in a cvar must not unlock everything).
-static func parse(p_choose: bool, allow_text: String, fixed_text: String, p_budget: int = 0) -> DotResult:
+static func parse(p_choose: bool, allow_text: String, fixed_text: String, p_budget: int = 0) -> GSResult:
 	var allow := parse_entries(allow_text, true)
 	if not allow.ok:
 		return allow.wrap("%s" % CVAR_ALLOW)
@@ -86,24 +86,24 @@ static func parse(p_choose: bool, allow_text: String, fixed_text: String, p_budg
 	if not fix.ok:
 		return fix.wrap("%s" % CVAR_FIXED)
 
-	var rules := DotLoadoutRules.new()
+	var rules := GSLoadoutRules.new()
 	rules.choose = p_choose
 	rules.point_budget = maxi(0, p_budget)
 	rules.allowed = allow.value
 	for slot_id: StringName in (fix.value as Dictionary).keys():
 		if slot_id == EVERY_SLOT:
-			return DotResult.fail(DotError.CODE_INVALID, "%s: '*' cannot be fixed; name the slot." % CVAR_FIXED)
+			return GSResult.fail(GSError.CODE_INVALID, "%s: '*' cannot be fixed; name the slot." % CVAR_FIXED)
 		var items: PackedStringArray = fix.value[slot_id]
 		if items.size() != 1 or items[0].begins_with("-") or items[0].begins_with("tag:"):
-			return DotResult.fail(DotError.CODE_INVALID,
+			return GSResult.fail(GSError.CODE_INVALID,
 				"%s: '%s' takes exactly one item id (or 'none')." % [CVAR_FIXED, slot_id])
 		rules.fixed[slot_id] = &"" if items[0] == NONE else StringName(items[0])
-	return DotResult.success(rules)
+	return GSResult.success(rules)
 
 
 ## `slot=a,b slot2=c` to slot id to [PackedStringArray]. [param lists] false is the fixed form,
 ## which the caller checks holds one entry per slot.
-static func parse_entries(text: String, lists: bool = true) -> DotResult:
+static func parse_entries(text: String, lists: bool = true) -> GSResult:
 	var out: Dictionary = {}
 	for raw in text.strip_edges().split(" ", false):
 		var entry := raw.strip_edges()
@@ -111,7 +111,7 @@ static func parse_entries(text: String, lists: bool = true) -> DotResult:
 			continue
 		var eq := entry.find("=")
 		if eq <= 0:
-			return DotResult.fail(DotError.CODE_INVALID, "'%s' is not slot=item." % entry)
+			return GSResult.fail(GSError.CODE_INVALID, "'%s' is not slot=item." % entry)
 		var slot_id := StringName(entry.substr(0, eq).strip_edges().to_lower())
 		var values := PackedStringArray()
 		for v in entry.substr(eq + 1).split(",", false):
@@ -120,16 +120,16 @@ static func parse_entries(text: String, lists: bool = true) -> DotResult:
 				continue
 			values.append(value)
 		if values.is_empty():
-			return DotResult.fail(DotError.CODE_INVALID, "'%s' names no item." % entry)
+			return GSResult.fail(GSError.CODE_INVALID, "'%s' names no item." % entry)
 		if out.has(slot_id):
 			if not lists:
-				return DotResult.fail(DotError.CODE_INVALID, "'%s' is named twice." % slot_id)
+				return GSResult.fail(GSError.CODE_INVALID, "'%s' is named twice." % slot_id)
 			var merged: PackedStringArray = out[slot_id]
 			merged.append_array(values)
 			out[slot_id] = merged
 		else:
 			out[slot_id] = values
-	return DotResult.success(out)
+	return GSResult.success(out)
 
 
 ## Whether these rules change anything at all.
@@ -144,7 +144,7 @@ func is_fixed(slot_id: StringName) -> bool:
 
 ## Whether [param item] may go in [param slot_id] under these rules. Says nothing about the schema
 ## or entitlements: the validator asks those separately.
-func permits(slot_id: StringName, item: DotItem) -> bool:
+func permits(slot_id: StringName, item: GSItem) -> bool:
 	if item == null:
 		return false
 	if fixed.has(slot_id):
@@ -154,7 +154,7 @@ func permits(slot_id: StringName, item: DotItem) -> bool:
 
 
 ## One list of patterns: any forbid that matches refuses; with any allow present, one must match.
-static func _passes(patterns: PackedStringArray, item: DotItem) -> bool:
+static func _passes(patterns: PackedStringArray, item: GSItem) -> bool:
 	if patterns.is_empty():
 		return true
 	var has_allow := false
@@ -172,14 +172,14 @@ static func _passes(patterns: PackedStringArray, item: DotItem) -> bool:
 	return allowed_hit or not has_allow
 
 
-static func _matches(pattern: String, item: DotItem) -> bool:
+static func _matches(pattern: String, item: GSItem) -> bool:
 	if pattern.begins_with("tag:"):
 		return item.has_tag(StringName(pattern.substr(4)))
 	return String(item.id).to_lower() == pattern
 
 
 ## Whether a player has anything to choose: choosing is on and some slot is not fixed.
-func lets_players_choose(schema: DotLoadoutSchema) -> bool:
+func lets_players_choose(schema: GSLoadoutSchema) -> bool:
 	if not choose:
 		return false
 	if schema == null:
@@ -194,36 +194,36 @@ func lets_players_choose(schema: DotLoadoutSchema) -> bool:
 ## fits its slot, and every required slot still has something legal. A failure names the first
 ## problem; a caller applying a cvar keeps its old rules on one, because a rule that empties a
 ## required slot is a player spawning with nothing in it.
-func check(schema: DotLoadoutSchema) -> DotResult:
+func check(schema: GSLoadoutSchema) -> GSResult:
 	if schema == null or schema.catalogue == null:
-		return DotResult.fail(DotError.CODE_STATE, "No schema to check the loadout rules against.")
+		return GSResult.fail(GSError.CODE_STATE, "No schema to check the loadout rules against.")
 	for slot_id: StringName in allowed.keys():
 		if slot_id != EVERY_SLOT and not schema.has_slot(slot_id):
-			return DotResult.fail(DotError.CODE_INVALID,
+			return GSResult.fail(GSError.CODE_INVALID,
 				"There is no '%s' slot (slots: %s)." % [slot_id, ", ".join(_slot_names(schema))])
 	for slot_id: StringName in fixed.keys():
 		var slot := schema.slot(slot_id)
 		if slot == null:
-			return DotResult.fail(DotError.CODE_INVALID,
+			return GSResult.fail(GSError.CODE_INVALID,
 				"There is no '%s' slot (slots: %s)." % [slot_id, ", ".join(_slot_names(schema))])
 		var item_id: StringName = fixed[slot_id]
 		if item_id == &"":
 			if slot.required:
-				return DotResult.fail(DotError.CODE_INVALID, "The '%s' slot is required and cannot be fixed empty." % slot_id)
+				return GSResult.fail(GSError.CODE_INVALID, "The '%s' slot is required and cannot be fixed empty." % slot_id)
 			continue
 		var item := schema.catalogue.find(item_id)
 		if item == null:
-			return DotResult.fail(DotError.CODE_INVALID, "No item '%s' to fix in '%s'." % [item_id, slot_id])
+			return GSResult.fail(GSError.CODE_INVALID, "No item '%s' to fix in '%s'." % [item_id, slot_id])
 		if not slot.accepts(item):
-			return DotResult.fail(DotError.CODE_INVALID, slot.rejection(item))
+			return GSResult.fail(GSError.CODE_INVALID, slot.rejection(item))
 	for slot in schema.required_slots():
 		if schema.choices_for(slot.id, null, self).is_empty():
-			return DotResult.fail(DotError.CODE_INVALID,
+			return GSResult.fail(GSError.CODE_INVALID,
 				"Nothing is left for the required '%s' slot under these rules." % slot.id)
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
-static func _slot_names(schema: DotLoadoutSchema) -> PackedStringArray:
+static func _slot_names(schema: GSLoadoutSchema) -> PackedStringArray:
 	var out := PackedStringArray()
 	for slot in schema.ordered_slots():
 		out.append(String(slot.id))
@@ -257,7 +257,7 @@ func to_dictionary() -> Dictionary:
 	return {"choose": choose, "allow": allow_text(), "fixed": fixed_text(), "budget": point_budget}
 
 
-static func from_dictionary(data: Dictionary) -> DotResult:
+static func from_dictionary(data: Dictionary) -> GSResult:
 	return parse(bool(data.get("choose", true)), str(data.get("allow", "")), str(data.get("fixed", "")),
 		int(data.get("budget", 0)))
 
@@ -276,4 +276,4 @@ func describe_lines() -> PackedStringArray:
 
 
 func _to_string() -> String:
-	return "DotLoadoutRules(%s)" % ", ".join(describe_lines())
+	return "GSLoadoutRules(%s)" % ", ".join(describe_lines())

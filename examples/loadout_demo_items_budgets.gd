@@ -24,11 +24,11 @@ func _test_items() -> void:
 		"unless it names a shared entitlement"
 	)
 
-	var loop := DotItem.make(&"loop")
+	var loop := GSItem.make(&"loop")
 	loop.fallback_id = &"loop"
 	_check(not loop.validate().ok, "an item that falls back to itself is refused")
 
-	var backwards := DotItem.make(&"backwards")
+	var backwards := GSItem.make(&"backwards")
 	backwards.count = 5
 	backwards.max_count = 2
 	_check(
@@ -65,7 +65,7 @@ func _test_text_order() -> void:
 	_section("lists are in text order, not interning order")
 
 	var ids := _unordered_ids("s_", 30)
-	var loadout := DotLoadout.empty(&"deathmatch")
+	var loadout := GSLoadout.empty(&"deathmatch")
 	for id in ids:
 		loadout.set_item(id, &"rifle")
 
@@ -82,17 +82,17 @@ func _test_text_order() -> void:
 	for slot in text:
 		parts.append("%s=rifle:0" % slot)
 	_check(
-		loadout.digest() == DotHash.sha256_text("\n".join(parts)),
+		loadout.digest() == GSHash.sha256_text("\n".join(parts)),
 		"so the digest is the one another program computes"
 	)
 
-	var owned := DotLoadoutEntitlements.of(_unordered_ids("e_", 30))
+	var owned := GSLoadoutEntitlements.of(_unordered_ids("e_", 30))
 	_check(_in_text_order(owned.to_list()), "entitlements list by text")
 
-	var items: Array[DotItem] = []
+	var items: Array[GSItem] = []
 	for id in _unordered_ids("i_", 30):
-		items.append(DotItem.make(id))
-	var catalogue := DotItemCatalogue.of(items)
+		items.append(GSItem.make(id))
+	var catalogue := GSItemCatalogue.of(items)
 	_check(catalogue.ids().size() == 30, "the generated catalogue holds every item")
 	_check(_in_text_order(catalogue.ids()), "and lists its ids by text")
 	_done()
@@ -103,12 +103,12 @@ func _test_catalogue() -> void:
 
 	_check(_catalogue.validate().ok, "the fixture catalogue validates")
 	_check(_catalogue.size() == 11, "every item is indexed", str(_catalogue.size()))
-	_check(_catalogue.of_kind(DotItem.KIND_CONSUMABLE).size() == 2, "kinds filter")
+	_check(_catalogue.of_kind(GSItem.KIND_CONSUMABLE).size() == 2, "kinds filter")
 	_check(_catalogue.with_tag(&"heavy").size() == 2, "tags filter")
 
 	# A fallback pointing at nothing is a runtime failure at the worst moment: a
 	# player whose content did not download loads into an error.
-	var broken := DotItemCatalogue.of([DotItem.make(&"a")])
+	var broken := GSItemCatalogue.of([GSItem.make(&"a")])
 	broken.items[0].fallback_id = &"missing"
 	_check(
 		not broken.validate().ok,
@@ -118,12 +118,12 @@ func _test_catalogue() -> void:
 	# A server has no resolver and must not need one.
 	var res := _catalogue.resolve(&"rifle")
 	_check(
-		not res.ok and res.code() == DotError.CODE_STATE,
+		not res.ok and res.code() == GSError.CODE_STATE,
 		"resolving without a resolver says so rather than pretending"
 	)
 
 	var client := _build_catalogue()
-	client.resolver = func(item: DotItem) -> Variant:
+	client.resolver = func(item: GSItem) -> Variant:
 		return null if item.content_id != "" else String(item.id)
 
 	var resolved := client.resolve(&"rifle")
@@ -140,8 +140,8 @@ func _test_catalogue() -> void:
 func _test_slots() -> void:
 	_section("slots")
 
-	var slot := DotLoadoutSlot.make(&"primary")
-	slot.kinds = [DotItem.KIND_WEAPON]
+	var slot := GSLoadoutSlot.make(&"primary")
+	slot.kinds = [GSItem.KIND_WEAPON]
 
 	_check(slot.accepts(_catalogue.find(&"rifle")), "a weapon slot accepts a weapon")
 	_check(
@@ -166,7 +166,7 @@ func _test_slots() -> void:
 
 	# A required slot with no default cannot be repaired, so the player can never
 	# spawn. Refusing the schema is the only way that is visible before a match.
-	var orphan := DotLoadoutSlot.make(&"orphan", true)
+	var orphan := GSLoadoutSlot.make(&"orphan", true)
 	_check(
 		not orphan.validate().ok,
 		"a required slot with no default is refused"
@@ -207,7 +207,7 @@ func _test_schema() -> void:
 		"a default outside the catalogue is refused too"
 	)
 
-	var choices := _schema.choices_for(&"primary", DotLoadoutEntitlements.none())
+	var choices := _schema.choices_for(&"primary", GSLoadoutEntitlements.none())
 	var ids: Array[StringName] = []
 	for item in choices:
 		ids.append(item.id)
@@ -239,19 +239,19 @@ func _test_document() -> void:
 	loadout.set_item(&"gear", &"")
 	_check(not loadout.has_slot(&"gear"), "setting an empty item clears the slot")
 
-	var round_trip := DotLoadout.from_dictionary(_full_loadout().to_dictionary())
+	var round_trip := GSLoadout.from_dictionary(_full_loadout().to_dictionary())
 	_check(round_trip.ok, "a loadout round-trips through a dictionary")
 	_check(
-		(round_trip.value as DotLoadout).equals(_full_loadout()),
+		(round_trip.value as GSLoadout).equals(_full_loadout()),
 		"unchanged"
 	)
 
 	# The digest must not depend on the order slots happened to be filled in.
-	var a := DotLoadout.empty(&"deathmatch")
+	var a := GSLoadout.empty(&"deathmatch")
 	a.set_item(&"primary", &"rifle")
 	a.set_item(&"secondary", &"pistol")
 
-	var b := DotLoadout.empty(&"deathmatch")
+	var b := GSLoadout.empty(&"deathmatch")
 	b.set_item(&"secondary", &"pistol")
 	b.set_item(&"primary", &"rifle")
 
@@ -262,37 +262,37 @@ func _test_document() -> void:
 
 	# Everything below is reachable from a file or from the network.
 	_check(
-		not DotLoadout.from_dictionary({"entries": "not a dictionary"}).ok,
+		not GSLoadout.from_dictionary({"entries": "not a dictionary"}).ok,
 		"entries that are not a dictionary are refused"
 	)
 	_check(
-		not DotLoadout.from_dictionary({"entries": {"primary": {"nested": 1}}}).ok,
+		not GSLoadout.from_dictionary({"entries": {"primary": {"nested": 1}}}).ok,
 		"an item that is not a string is refused rather than coerced"
 	)
 	_check(
-		not DotLoadout.from_dictionary({
+		not GSLoadout.from_dictionary({
 			"entries": {"primary": "x".repeat(200)}
 		}).ok,
 		"an over-long id is refused"
 	)
 
 	var too_many := {}
-	for index in range(DotLoadout.MAX_SLOTS + 5):
+	for index in range(GSLoadout.MAX_SLOTS + 5):
 		too_many["slot_%d" % index] = "rifle"
 	_check(
-		not DotLoadout.from_dictionary({"entries": too_many}).ok,
+		not GSLoadout.from_dictionary({"entries": too_many}).ok,
 		"a loadout with more entries than the bound is refused"
 	)
 
-	_check(not DotLoadout.from_json("[]").ok, "a JSON array is not a loadout")
-	_check(not DotLoadout.from_json("not json").ok, "and neither is nonsense")
+	_check(not GSLoadout.from_json("[]").ok, "a JSON array is not a loadout")
+	_check(not GSLoadout.from_json("not json").ok, "and neither is nonsense")
 	_done()
 
 
 func _test_entitlements() -> void:
 	_section("entitlements")
 
-	var none := DotLoadoutEntitlements.none()
+	var none := GSLoadoutEntitlements.none()
 	_check(
 		none.allows(_catalogue.find(&"rifle")),
 		"a free item is allowed with no entitlements at all"
@@ -302,19 +302,19 @@ func _test_entitlements() -> void:
 		"and a paid one is not"
 	)
 
-	var owner := DotLoadoutEntitlements.of([&"sniper"])
+	var owner := GSLoadoutEntitlements.of([&"sniper"])
 	_check(owner.allows(_catalogue.find(&"sniper")), "granting an id allows it")
 	_check(not owner.allows(_catalogue.find(&"rocket")), "and only it")
 
 	# The shared-unlock indirection: one grant, two items.
-	var pack := DotLoadoutEntitlements.of([&"camo_pack"])
+	var pack := GSLoadoutEntitlements.of([&"camo_pack"])
 	_check(
 		pack.allows(_catalogue.find(&"camo_rifle"))
 			and pack.allows(_catalogue.find(&"camo_pistol")),
 		"a shared entitlement unlocks every item that names it"
 	)
 
-	var everything := DotLoadoutEntitlements.everything()
+	var everything := GSLoadoutEntitlements.everything()
 	_check(
 		everything.allows(_catalogue.find(&"rocket")),
 		"an unrestricted set allows anything"
@@ -323,8 +323,8 @@ func _test_entitlements() -> void:
 	owner.revoke(&"sniper")
 	_check(not owner.allows(_catalogue.find(&"sniper")), "revoking works")
 
-	var merged := DotLoadoutEntitlements.of([&"sniper"])
-	merged.merge(DotLoadoutEntitlements.of([&"rocket"]))
+	var merged := GSLoadoutEntitlements.of([&"sniper"])
+	merged.merge(GSLoadoutEntitlements.of([&"rocket"]))
 	_check(merged.count() == 2, "merging combines two sets")
 	_done()
 
@@ -332,19 +332,19 @@ func _test_entitlements() -> void:
 func _test_validation() -> void:
 	_section("validation")
 
-	var owner := DotLoadoutEntitlements.of([&"sniper", &"armour"])
+	var owner := GSLoadoutEntitlements.of([&"sniper", &"armour"])
 
 	var good := _full_loadout()
 	_check(
-		DotLoadoutValidator.validate(good, _schema, owner).ok,
+		GSLoadoutValidator.validate(good, _schema, owner).ok,
 		"a legal loadout validates"
 	)
 
 	var unowned := _full_loadout()
 	unowned.set_item(&"primary", &"rocket")
-	var res := DotLoadoutValidator.validate(unowned, _schema, owner)
+	var res := GSLoadoutValidator.validate(unowned, _schema, owner)
 	_check(
-		not res.ok and res.code() == DotError.CODE_FORBIDDEN,
+		not res.ok and res.code() == GSError.CODE_FORBIDDEN,
 		"an item the player has not unlocked is refused as forbidden",
 		res.code()
 	)
@@ -352,28 +352,28 @@ func _test_validation() -> void:
 	var wrong_slot := _full_loadout()
 	wrong_slot.set_item(&"utility", &"rifle")
 	_check(
-		not DotLoadoutValidator.validate(wrong_slot, _schema, owner).ok,
+		not GSLoadoutValidator.validate(wrong_slot, _schema, owner).ok,
 		"a weapon in a consumable slot is refused"
 	)
 
 	var invented := _full_loadout()
 	invented.set_item(&"backpack", &"rifle")
 	_check(
-		not DotLoadoutValidator.validate(invented, _schema, owner).ok,
+		not GSLoadoutValidator.validate(invented, _schema, owner).ok,
 		"a slot the schema does not have is refused"
 	)
 
 	var missing := _full_loadout()
 	missing.clear_slot(&"secondary")
 	_check(
-		not DotLoadoutValidator.validate(missing, _schema, owner).ok,
+		not GSLoadoutValidator.validate(missing, _schema, owner).ok,
 		"an empty required slot is refused"
 	)
 
 	var over_count := _full_loadout()
 	over_count.set_item(&"utility", &"grenade", 99)
 	_check(
-		not DotLoadoutValidator.validate(over_count, _schema, owner).ok,
+		not GSLoadoutValidator.validate(over_count, _schema, owner).ok,
 		"a count above the carry limit is refused"
 	)
 
@@ -382,7 +382,7 @@ func _test_validation() -> void:
 	var retired := _full_loadout()
 	retired.set_item(&"primary", &"old_rifle")
 	_check(
-		DotLoadoutValidator.validate(retired, _schema, owner).ok,
+		GSLoadoutValidator.validate(retired, _schema, owner).ok,
 		"a retired item is still valid in a saved loadout"
 	)
 
@@ -394,30 +394,30 @@ func _check_duplicates() -> void:
 	# Duplicates. A local fixture, because every item in the shared catalogue is
 	# locked to one slot and the same item could never appear in two of them — which
 	# would make this pass for the wrong reason.
-	var anywhere := DotItem.make(&"anywhere", DotItem.KIND_WEAPON, true)
-	var dup_schema := DotLoadoutSchema.of(
+	var anywhere := GSItem.make(&"anywhere", GSItem.KIND_WEAPON, true)
+	var dup_schema := GSLoadoutSchema.of(
 		&"dup",
 		[
-			DotLoadoutSlot.make(&"a", true, &"anywhere"),
-			DotLoadoutSlot.make(&"b", true, &"anywhere"),
+			GSLoadoutSlot.make(&"a", true, &"anywhere"),
+			GSLoadoutSlot.make(&"b", true, &"anywhere"),
 		],
-		DotItemCatalogue.of([anywhere])
+		GSItemCatalogue.of([anywhere])
 	)
 
-	var duplicated := DotLoadout.empty(&"dup")
+	var duplicated := GSLoadout.empty(&"dup")
 	duplicated.set_item(&"a", &"anywhere")
 	duplicated.set_item(&"b", &"anywhere")
 	_check(
-		not DotLoadoutValidator.validate(
-			duplicated, dup_schema, DotLoadoutEntitlements.everything()
+		not GSLoadoutValidator.validate(
+			duplicated, dup_schema, GSLoadoutEntitlements.everything()
 		).ok,
 		"the same item in two slots is refused when the schema forbids it"
 	)
 
 	dup_schema.allow_duplicates = true
 	_check(
-		DotLoadoutValidator.validate(
-			duplicated, dup_schema, DotLoadoutEntitlements.everything()
+		GSLoadoutValidator.validate(
+			duplicated, dup_schema, GSLoadoutEntitlements.everything()
 		).ok,
 		"and permitted when it allows it"
 	)
@@ -426,14 +426,14 @@ func _check_duplicates() -> void:
 func _test_conform() -> void:
 	_section("conform")
 
-	var owner := DotLoadoutEntitlements.none()
+	var owner := GSLoadoutEntitlements.none()
 
-	var broken := DotLoadout.empty(&"old_schema")
+	var broken := GSLoadout.empty(&"old_schema")
 	broken.set_item(&"primary", &"rocket")
 	broken.set_item(&"backpack", &"rifle")
 	broken.set_item(&"utility", &"grenade", 99)
 
-	var changes := DotLoadoutValidator.conform(broken, _schema, owner)
+	var changes := GSLoadoutValidator.conform(broken, _schema, owner)
 
 	_check(changes.size() >= 2, "conforming reports what it changed", str(changes.size()))
 	_check(broken.schema_id == &"deathmatch", "and restamps the schema")
@@ -448,15 +448,15 @@ func _test_conform() -> void:
 
 	# The whole point: a conformed loadout validates.
 	_check(
-		DotLoadoutValidator.validate(broken, _schema, owner).ok,
+		GSLoadoutValidator.validate(broken, _schema, owner).ok,
 		"and the result is a loadout that validates"
 	)
 
 	# Conforming an empty loadout must produce a playable one.
-	var empty := DotLoadout.empty()
-	DotLoadoutValidator.conform(empty, _schema, owner)
+	var empty := GSLoadout.empty()
+	GSLoadoutValidator.conform(empty, _schema, owner)
 	_check(
-		DotLoadoutValidator.validate(empty, _schema, owner).ok,
+		GSLoadoutValidator.validate(empty, _schema, owner).ok,
 		"conforming an empty loadout produces a playable one"
 	)
 	_done()
@@ -465,9 +465,9 @@ func _test_conform() -> void:
 func _test_budgets() -> void:
 	_section("budgets")
 
-	var rich := DotLoadoutEntitlements.everything()
+	var rich := GSLoadoutEntitlements.everything()
 
-	var expensive := DotLoadout.empty(&"deathmatch")
+	var expensive := GSLoadout.empty(&"deathmatch")
 	expensive.set_item(&"primary", &"rocket")
 	expensive.set_item(&"secondary", &"pistol")
 	expensive.set_item(&"gear", &"armour")
@@ -477,7 +477,7 @@ func _test_budgets() -> void:
 		str(_schema.points_used(expensive)))
 
 	expensive.set_item(&"utility", &"grenade", 2)
-	var over := DotLoadout.empty(&"deathmatch")
+	var over := GSLoadout.empty(&"deathmatch")
 	over.set_item(&"primary", &"rocket")
 	over.set_item(&"secondary", &"pistol")
 	over.set_item(&"gear", &"armour")
@@ -488,13 +488,13 @@ func _test_budgets() -> void:
 	tight.point_budget = 8
 
 	_check(
-		not DotLoadoutValidator.validate(over, tight, rich).ok,
+		not GSLoadoutValidator.validate(over, tight, rich).ok,
 		"a loadout over its point budget is refused"
 	)
 
 	# Conforming trims the most expensive optional item, not a required one.
 	var trimmed := over.duplicate_loadout()
-	DotLoadoutValidator.conform(trimmed, tight, rich)
+	GSLoadoutValidator.conform(trimmed, tight, rich)
 	_check(
 		trimmed.has_slot(&"primary") and trimmed.has_slot(&"secondary"),
 		"trimming keeps the required slots"
@@ -505,17 +505,17 @@ func _test_budgets() -> void:
 		"%d of %d" % [tight.points_used(trimmed), tight.point_budget]
 	)
 	_check(
-		DotLoadoutValidator.validate(trimmed, tight, rich).ok,
+		GSLoadoutValidator.validate(trimmed, tight, rich).ok,
 		"so the trimmed loadout validates"
 	)
 
 	var heavy := _build_schema()
 	heavy.weight_budget = 6.0
-	var loaded := DotLoadout.empty(&"deathmatch")
+	var loaded := GSLoadout.empty(&"deathmatch")
 	loaded.set_item(&"primary", &"rocket")
 	loaded.set_item(&"secondary", &"pistol")
 	_check(
-		not DotLoadoutValidator.validate(loaded, heavy, rich).ok,
+		not GSLoadoutValidator.validate(loaded, heavy, rich).ok,
 		"weight is a separate budget and is enforced separately"
 	)
 	_done()

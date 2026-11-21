@@ -1,5 +1,5 @@
 @tool
-class_name DotLoadoutSlot
+class_name GSLoadoutSlot
 extends Resource
 
 ## One position in a loadout, and what may go in it.
@@ -9,13 +9,13 @@ extends Resource
 ## what lets a game mode swap one schema for another — hardcore, pistols-only, a
 ## gun-game ladder — without editing every item.
 
-## Stable id. The key in a [DotLoadout] and on the wire.
+## Stable id. The key in a [GSLoadout] and on the wire.
 @export var id: StringName = &""
 
 @export var display_name: String = ""
 
 ## Must be filled. A loadout missing it is invalid, and is repaired to
-## [member default_item] rather than refused — see [DotLoadoutValidator].
+## [member default_item] rather than refused — see [GSLoadoutValidator].
 @export var required: bool = false
 
 ## Used when the slot is required and empty, and when conforming a broken loadout.
@@ -38,7 +38,7 @@ extends Resource
 ## The 1-based arsenal slot this maps to, for a slot holding a weapon.
 ##
 ## Zero means this slot is not a weapon slot. GameSpice Loadout never imports GameSpice Combat;
-## this is a number a game matches against `DotWeaponDef.slot`.
+## this is a number a game matches against `GSWeaponDef.slot`.
 @export_range(0, 16, 1) var arsenal_slot: int = 0
 
 @export_group("Presentation")
@@ -51,8 +51,8 @@ static func make(
 	p_id: StringName,
 	p_required: bool = false,
 	p_default: StringName = &""
-) -> DotLoadoutSlot:
-	var slot := DotLoadoutSlot.new()
+) -> GSLoadoutSlot:
+	var slot := GSLoadoutSlot.new()
 	slot.id = p_id
 	slot.display_name = String(p_id).capitalize()
 	slot.required = p_required
@@ -66,7 +66,7 @@ static func make(
 ## the rifle slot" and "you do not own that rifle" are different answers and a loadout
 ## screen wants to show them differently — one greys the item out, the other offers to
 ## sell it.
-func accepts(item: DotItem) -> bool:
+func accepts(item: GSItem) -> bool:
 	if item == null:
 		return false
 
@@ -97,7 +97,7 @@ func accepts(item: DotItem) -> bool:
 ## Separate from [method accepts] because a boolean is what the validator needs and a
 ## reason is what a person debugging a schema needs, and computing the reason on every
 ## acceptance check would be a string allocation per item per slot per screen refresh.
-func rejection(item: DotItem) -> String:
+func rejection(item: GSItem) -> String:
 	if item == null:
 		return "no item"
 
@@ -123,18 +123,18 @@ func rejection(item: DotItem) -> String:
 	return ""
 
 
-func validate() -> DotResult:
+func validate() -> GSResult:
 	if id == &"":
-		return DotResult.fail(DotError.CODE_INVALID, "A slot needs an id.")
+		return GSResult.fail(GSError.CODE_INVALID, "A slot needs an id.")
 
 	if required and default_item == &"":
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"Slot '%s' is required but has no default, so a loadout missing it "
 			% id + "cannot be repaired and can only be refused."
 		)
 
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
 func describe() -> Dictionary:
@@ -148,4 +148,4 @@ func describe() -> Dictionary:
 
 
 func _to_string() -> String:
-	return "DotLoadoutSlot(%s)" % id
+	return "GSLoadoutSlot(%s)" % id

@@ -1,4 +1,4 @@
-class_name DotLoadoutSiteSource
+class_name GSLoadoutSiteSource
 extends RefCounted
 
 ## Site store entitlements, points and loadout for one server ([method source] as the entitlement_source,
@@ -24,7 +24,7 @@ const ME_PATH := "me"
 ## The size of a raw Ed25519 public key, which is what TMC's `publicKey` holds.
 const ED25519_KEY_BYTES := 32
 
-## Any object with `get_integration(String, Dictionary) -> DotResult` ([method purchase] also needs `post_integration`).
+## Any object with `get_integration(String, Dictionary) -> GSResult` ([method purchase] also needs `post_integration`).
 var client: Object = null
 
 ## Seconds a player's answer is trusted before the next read is started; 0 keeps it until the token's `exp`.
@@ -35,7 +35,7 @@ var ttl_secs: float = 30.0
 var public_key: String = ""
 
 ## The followed key list, made on first use when [member public_key] is empty.
-var keys: DotLoadoutSiteKeys = null
+var keys: GSLoadoutSiteKeys = null
 
 ## This server's scope name; the token's `aud` must equal it. Empty while following asks the site (`GET me`).
 var audience: String = ""
@@ -47,10 +47,10 @@ var include_loadout: bool = true
 ## Also take `grant.unlock` from the unsigned body for keys a v1 token verified. Off: a v2 token signs the unlock ids.
 var unsigned_grants: bool = false
 
-## Optional [DotLoadoutSiteSettings]; while its store section says `enabled: false` nothing is granted.
+## Optional [GSLoadoutSiteSettings]; while its store section says `enabled: false` nothing is granted.
 var settings: Object = null
 
-## `func(bytes: PackedByteArray, signature: PackedByteArray, key: String) -> DotResult`; empty uses
+## `func(bytes: PackedByteArray, signature: PackedByteArray, key: String) -> GSResult`; empty uses
 ## [method cloud_verify]. Tests inject one; a game should not.
 var verifier: Callable = Callable()
 
@@ -61,29 +61,29 @@ var _configured := false
 var _audience_tried_at: float = -1.0
 
 
-static func with_client(p_client: Object) -> DotLoadoutSiteSource:
-	var s := DotLoadoutSiteSource.new()
+static func with_client(p_client: Object) -> GSLoadoutSiteSource:
+	var s := GSLoadoutSiteSource.new()
 	s.client = p_client
 	return s
 
 
-## A source set up from [param config] ([DotLoadoutConfig]): following the site's key list, or pinned
+## A source set up from [param config] ([GSLoadoutConfig]): following the site's key list, or pinned
 ## when the config sets a key. Fails only when a configured pin cannot be read.
-static func from_config(config: DotLoadoutConfig, p_client: Object = null) -> DotResult:
-	var s := DotLoadoutSiteSource.with_client(p_client)
+static func from_config(config: GSLoadoutConfig, p_client: Object = null) -> GSResult:
+	var s := GSLoadoutSiteSource.with_client(p_client)
 	var key := config.site_key()
 	if not key.ok:
 		return key
 	s.public_key = key.value
 	if s.public_key == "":
-		s.keys = DotLoadoutSiteKeys.from_config(config, p_client)
+		s.keys = GSLoadoutSiteKeys.from_config(config, p_client)
 	s.audience = config.site_audience
 	s.ttl_secs = config.site_ttl_sec
 	s.include_points = config.site_include_points
 	s.include_loadout = config.site_include_loadout
 	s.unsigned_grants = config.site_unsigned_grants
 	s._configured = true
-	return DotResult.success(s)
+	return GSResult.success(s)
 
 
 ## Unlock ids from an entitlements response: each item's key, plus a string or array under `grant.unlock`.
@@ -126,9 +126,9 @@ static func _unlock_ids(extra: Variant) -> Array:
 static func verify_token(
 	token: String, pinned_key: String, p_audience: String, player_key: String,
 	now_unix: float, p_verifier: Callable = Callable()
-) -> DotResult:
+) -> GSResult:
 	if pinned_key.strip_edges() == "":
-		return DotResult.fail(DotError.CODE_STATE, "No site key to verify against.")
+		return GSResult.fail(GSError.CODE_STATE, "No site key to verify against.")
 	return verify_token_any(token, [pinned_key.strip_edges()], p_audience, player_key, now_unix, p_verifier)
 
 
@@ -136,74 +136,74 @@ static func verify_token(
 static func verify_token_any(
 	token: String, keys: Array, p_audience: String, player_key: String,
 	now_unix: float, p_verifier: Callable = Callable()
-) -> DotResult:
+) -> GSResult:
 	if keys.is_empty():
-		return DotResult.fail(DotError.CODE_STATE, "No site key to verify against.")
+		return GSResult.fail(GSError.CODE_STATE, "No site key to verify against.")
 	if p_audience == "":
-		return DotResult.fail(DotError.CODE_STATE, "No site audience; set site_audience to this server's scope name.")
+		return GSResult.fail(GSError.CODE_STATE, "No site audience; set site_audience to this server's scope name.")
 	var parts := token.split(".")
 	if parts.size() != 2 or parts[0] == "" or parts[1] == "":
-		return DotResult.fail(DotError.CODE_INTEGRITY, "The response carries no well-formed token.")
-	var sig := DotHash.base64url_decode(parts[1])
+		return GSResult.fail(GSError.CODE_INTEGRITY, "The response carries no well-formed token.")
+	var sig := GSHash.base64url_decode(parts[1])
 	var signed := parts[0].to_ascii_buffer()
 	var verified: Variant = null
 	for key: Variant in keys:
 		verified = p_verifier.call(signed, sig, str(key)) if p_verifier.is_valid() else cloud_verify(signed, sig, str(key))
-		if not verified is DotResult:
-			return DotResult.fail(DotError.CODE_INTERNAL, "The token verifier returned no result.")
-		if (verified as DotResult).ok:
+		if not verified is GSResult:
+			return GSResult.fail(GSError.CODE_INTERNAL, "The token verifier returned no result.")
+		if (verified as GSResult).ok:
 			break
-	if not (verified as DotResult).ok:
-		return (verified as DotResult).wrap("The token signature did not verify")
-	var payload: Variant = JSON.parse_string(DotHash.base64url_decode_text(parts[0]))
+	if not (verified as GSResult).ok:
+		return (verified as GSResult).wrap("The token signature did not verify")
+	var payload: Variant = JSON.parse_string(GSHash.base64url_decode_text(parts[0]))
 	if not payload is Dictionary:
-		return DotResult.fail(DotError.CODE_PARSE, "The token payload is not an object.")
+		return GSResult.fail(GSError.CODE_PARSE, "The token payload is not an object.")
 	var p: Dictionary = payload
 	var version := int(p.get("v", 0))
 	if version < OLDEST_TOKEN_VERSION or version > TOKEN_VERSION:
-		return DotResult.fail(DotError.CODE_VERSION, "Unknown token version %s." % str(p.get("v")))
+		return GSResult.fail(GSError.CODE_VERSION, "Unknown token version %s." % str(p.get("v")))
 	if str(p.get("aud", "")) != p_audience:
-		return DotResult.fail(DotError.CODE_FORBIDDEN, "The token is for another app or server (aud %s)." % str(p.get("aud", "")))
+		return GSResult.fail(GSError.CODE_FORBIDDEN, "The token is for another app or server (aud %s)." % str(p.get("aud", "")))
 	if str(p.get("sub", "")) != player_key:
-		return DotResult.fail(DotError.CODE_FORBIDDEN, "The token is for another player.")
+		return GSResult.fail(GSError.CODE_FORBIDDEN, "The token is for another player.")
 	var expires: Variant = p.get("exp")
 	if not (expires is float or expires is int) or float(expires) <= now_unix:
-		return DotResult.fail(DotError.CODE_AUTH, "The token has expired.")
-	return DotResult.success(p)
+		return GSResult.fail(GSError.CODE_AUTH, "The token has expired.")
+	return GSResult.success(p)
 
 
 ## The default verifier: GameSpice Cloud's signature check. An RSA PEM key uses its RSA-SHA256 `verify`;
 ## a raw Ed25519 key needs its `verify_ed25519(bytes, signature, key_bytes)`, and fails loudly without.
-static func cloud_verify(bytes: PackedByteArray, signature: PackedByteArray, key: String) -> DotResult:
+static func cloud_verify(bytes: PackedByteArray, signature: PackedByteArray, key: String) -> GSResult:
 	if not ResourceLoader.exists(CLOUD_SIGNATURE):
-		return DotResult.fail(DotError.CODE_STATE, "dot-cloud is not installed, so site tokens cannot be verified.")
+		return GSResult.fail(GSError.CODE_STATE, "dot-cloud is not installed, so site tokens cannot be verified.")
 	var script: Script = load(CLOUD_SIGNATURE)
 	if key.contains("BEGIN PUBLIC KEY"):
 		return script.call("verify", bytes, Marshalls.raw_to_base64(signature), key)
-	var raw := DotHash.base64url_decode(key)
+	var raw := GSHash.base64url_decode(key)
 	if raw.size() != ED25519_KEY_BYTES:
-		return DotResult.fail(DotError.CODE_INVALID, "The pinned site key is neither an RSA PEM nor a raw Ed25519 key.")
+		return GSResult.fail(GSError.CODE_INVALID, "The pinned site key is neither an RSA PEM nor a raw Ed25519 key.")
 	for m: Dictionary in script.get_script_method_list():
 		if m.get("name") == "verify_ed25519":
 			return script.call("verify_ed25519", bytes, signature, raw)
-	return DotResult.fail(DotError.CODE_UNSUPPORTED, "This dot-cloud has no Ed25519 verifier, so TMC's token cannot be checked.")
+	return GSResult.fail(GSError.CODE_UNSUPPORTED, "This dot-cloud has no Ed25519 verifier, so TMC's token cannot be checked.")
 
 
 ## Reads the player's entitlements, points and loadout now. The value is the id array. A token that
 ## does not verify clears what was cached for the player, logs an error and emits [signal rejected].
-## With no [member public_key] set, the first read takes the site_* keys from a layered [DotLoadoutConfig].
-func refresh(player_key: String) -> DotResult:
+## With no [member public_key] set, the first read takes the site_* keys from a layered [GSLoadoutConfig].
+func refresh(player_key: String) -> GSResult:
 	if client == null or not client.has_method("get_integration"):
-		return DotResult.fail(DotError.CODE_STATE, "No backbone client with get_integration.")
+		return GSResult.fail(GSError.CODE_STATE, "No backbone client with get_integration.")
 	if _inflight.has(player_key):
-		return DotResult.success(ids_of(player_key))
+		return GSResult.success(ids_of(player_key))
 	if public_key == "" and not _configured:
 		_configure(null)
 	_inflight[player_key] = true
-	var res: DotResult = await client.call("get_integration", PATH, _query(player_key))
+	var res: GSResult = await client.call("get_integration", PATH, _query(player_key))
 	_inflight.erase(player_key)
 	if not res.ok:
-		DotLog.warn(CHANNEL, "store entitlements read failed", {"error": str(res.error)})
+		GSLog.warn(CHANNEL, "store entitlements read failed", {"error": str(res.error)})
 		return res
 	return await ingest(player_key, res.value)
 
@@ -211,11 +211,11 @@ func refresh(player_key: String) -> DotResult:
 ## Applies a site store answer that carries a token (an entitlements read or a [method purchase]) at
 ## once, so a purchase counts without waiting for [member ttl_secs]. Same checks and value as
 ## [method refresh]. Await it: following the key list may read the list first.
-func ingest(player_key: String, answer: Variant) -> DotResult:
+func ingest(player_key: String, answer: Variant) -> GSResult:
 	if public_key == "" and not _configured:
 		_configure(null)
 	if not answer is Dictionary:
-		return _reject(player_key, DotResult.fail(DotError.CODE_INVALID, "The entitlements response is not an object."))
+		return _reject(player_key, GSResult.fail(GSError.CODE_INVALID, "The entitlements response is not an object."))
 	var body: Dictionary = answer
 	var token := str(body.get("token", ""))
 	var trusted := await _keys_for(token, str(body.get("publicKey", "")))
@@ -230,44 +230,44 @@ func ingest(player_key: String, answer: Variant) -> DotResult:
 	var entry := _entry_from(checked.value, body, now)
 	_cache[player_key] = entry
 	refreshed.emit(player_key)
-	return DotResult.success(entry["ids"])
+	return GSResult.success(entry["ids"])
 
 
 ## The keys [param token] may verify against: the strict pin, or the followed list's key for its `kid`.
-func _keys_for(token: String, sent_key: String) -> DotResult:
+func _keys_for(token: String, sent_key: String) -> GSResult:
 	var pin := public_key.strip_edges()
 	if pin != "":
-		var kid := DotLoadoutSiteKeys.token_kid(token)
+		var kid := GSLoadoutSiteKeys.token_kid(token)
 		var raw := not pin.contains("BEGIN PUBLIC KEY")
-		if raw and ((sent_key != "" and sent_key != pin) or (kid != "" and kid != DotLoadoutSiteKeys.kid_of(pin))):
-			return DotResult.fail(DotError.CODE_INTEGRITY, ("The site signs with key %s, not the pinned site_public_key (%s): it rotated its key. "
+		if raw and ((sent_key != "" and sent_key != pin) or (kid != "" and kid != GSLoadoutSiteKeys.kid_of(pin))):
+			return GSResult.fail(GSError.CODE_INTEGRITY, ("The site signs with key %s, not the pinned site_public_key (%s): it rotated its key. "
 				+ "Re-pin site_public_key, or clear site_public_key and site_public_key_path to follow the site's key list.") % [
-				kid if kid != "" else DotLoadoutSiteKeys.kid_of(sent_key), DotLoadoutSiteKeys.kid_of(pin)])
-		return DotResult.success([pin])
+				kid if kid != "" else GSLoadoutSiteKeys.kid_of(sent_key), GSLoadoutSiteKeys.kid_of(pin)])
+		return GSResult.success([pin])
 	if keys == null:
-		keys = DotLoadoutSiteKeys.with_client(client)
+		keys = GSLoadoutSiteKeys.with_client(client)
 	if keys.client == null:
 		keys.client = client
-	return await keys.keys_for(DotLoadoutSiteKeys.token_kid(token))
+	return await keys.keys_for(GSLoadoutSiteKeys.token_kid(token))
 
 
 ## Following, with no [member audience] set: asks the site which target this credential is for
-## (`GET me` -> `target {kind, id}`), at most once per [member DotLoadoutSiteKeys.refetch_min_sec].
+## (`GET me` -> `target {kind, id}`), at most once per [member GSLoadoutSiteKeys.refetch_min_sec].
 func _learn_audience() -> void:
 	var now := Time.get_unix_time_from_system()
 	var gap := keys.refetch_min_sec if keys != null else 30.0
 	if client == null or (_audience_tried_at >= 0.0 and gap > 0.0 and now - _audience_tried_at < gap):
 		return
 	_audience_tried_at = now
-	var res: DotResult = await client.call("get_integration", ME_PATH, {})
+	var res: GSResult = await client.call("get_integration", ME_PATH, {})
 	var target: Variant = (res.value as Dictionary).get("target") if res.ok and res.value is Dictionary else null
 	if not target is Dictionary or str((target as Dictionary).get("kind", "")) == "" or (target as Dictionary).get("id") == null:
-		DotLog.error(CHANNEL, "site audience unknown; set site_audience to this server's scope name (server:<id>)",
+		GSLog.error(CHANNEL, "site audience unknown; set site_audience to this server's scope name (server:<id>)",
 			{"error": str(res.error) if not res.ok else "no target in the me answer"})
 		return
 	var id: Variant = target["id"]
 	audience = "%s:%s" % [str(target["kind"]), str(int(id)) if id is float else str(id)]
-	DotLog.info(CHANNEL, "site audience from the credential", {"audience": audience})
+	GSLog.info(CHANNEL, "site audience from the credential", {"audience": audience})
 
 
 func _query(player_key: String) -> Dictionary:
@@ -282,9 +282,9 @@ func _query(player_key: String) -> Dictionary:
 	return q
 
 
-func _reject(player_key: String, why: DotResult) -> DotResult:
+func _reject(player_key: String, why: GSResult) -> GSResult:
 	_cache[player_key] = {"ids": [], "points": {}, "loadout": [], "at": Time.get_ticks_msec() / 1000.0, "exp": 0.0}
-	DotLog.error(CHANNEL, "site token rejected; granting nothing", {"player": player_key, "error": str(why.error)})
+	GSLog.error(CHANNEL, "site token rejected; granting nothing", {"player": player_key, "error": str(why.error)})
 	rejected.emit(player_key, why.error.message)
 	return why
 
@@ -375,25 +375,25 @@ func _stale(entry: Dictionary) -> bool:
 
 
 ## The manager's `entitlement_source`.
-func source(player_key: String) -> DotLoadoutEntitlements:
+func source(player_key: String) -> GSLoadoutEntitlements:
 	if _stale(_cache.get(player_key, {})) and client != null:
 		refresh(player_key)
-	return DotLoadoutEntitlements.of(ids_of(player_key))
+	return GSLoadoutEntitlements.of(ids_of(player_key))
 
 
-## An `entitlement_source`: [param base] (player key -> [DotLoadoutEntitlements]; invalid is none) plus
-## what the site store says the player owns. Client from [DotRegistry] on first use (none: [param base]
-## stands); [param config] holds site_* (null: a layered [DotLoadoutConfig]).
-static func layered(base: Callable = Callable(), config: DotLoadoutConfig = null) -> Callable:
-	var site := DotLoadoutSiteSource.new()
-	return func(key: String) -> DotLoadoutEntitlements:
-		var ent: DotLoadoutEntitlements = DotLoadoutEntitlements.none()
+## An `entitlement_source`: [param base] (player key -> [GSLoadoutEntitlements]; invalid is none) plus
+## what the site store says the player owns. Client from [GSRegistry] on first use (none: [param base]
+## stands); [param config] holds site_* (null: a layered [GSLoadoutConfig]).
+static func layered(base: Callable = Callable(), config: GSLoadoutConfig = null) -> Callable:
+	var site := GSLoadoutSiteSource.new()
+	return func(key: String) -> GSLoadoutEntitlements:
+		var ent: GSLoadoutEntitlements = GSLoadoutEntitlements.none()
 		if base.is_valid():
 			var got: Variant = base.call(key)
-			if got is DotLoadoutEntitlements:
+			if got is GSLoadoutEntitlements:
 				ent.merge(got)
 		if site.client == null:
-			site.client = DotRegistry.get_service(&"dot_backbone_client")
+			site.client = GSRegistry.get_service(&"dot_backbone_client")
 		if site.client != null and not site._configured:
 			site._configure(config)
 		if site.client != null:
@@ -401,17 +401,17 @@ static func layered(base: Callable = Callable(), config: DotLoadoutConfig = null
 		return ent
 
 
-func _configure(config: DotLoadoutConfig) -> void:
+func _configure(config: GSLoadoutConfig) -> void:
 	_configured = true
 	var cfg := config
 	if cfg == null:
-		cfg = DotLoadoutConfig.new()
+		cfg = GSLoadoutConfig.new()
 		cfg.load_layered()
-	var made := DotLoadoutSiteSource.from_config(cfg, client)
+	var made := GSLoadoutSiteSource.from_config(cfg, client)
 	if not made.ok:
-		DotLog.error(CHANNEL, "site key config unusable; the site grants nothing", {"error": str(made.error)})
+		GSLog.error(CHANNEL, "site key config unusable; the site grants nothing", {"error": str(made.error)})
 		return
-	var s: DotLoadoutSiteSource = made.value
+	var s: GSLoadoutSiteSource = made.value
 	public_key = s.public_key
 	if keys == null:
 		keys = s.keys
@@ -420,7 +420,7 @@ func _configure(config: DotLoadoutConfig) -> void:
 	include_points = s.include_points
 	include_loadout = s.include_loadout
 	unsigned_grants = s.unsigned_grants
-	DotLog.info(CHANNEL, "site token keys", {"mode": "pinned" if public_key != "" else "follow the site key list",
+	GSLog.info(CHANNEL, "site token keys", {"mode": "pinned" if public_key != "" else "follow the site key list",
 		"audience": audience if audience != "" else "(asked of the site)"})
 
 
@@ -432,31 +432,31 @@ func key_mode() -> String:
 ## Buys [param item_id] for the player with their app points (TMC's STORE_WRITE scope) and applies the
 ## answer's token at once. The value is TMC's answer (`status`, `purchase`, `points`, `items`). An empty
 ## [param idem_key] makes one, so a retry of the same press must pass the same key.
-func purchase(player_key: String, item_id: String, idem_key: String = "") -> DotResult:
+func purchase(player_key: String, item_id: String, idem_key: String = "") -> GSResult:
 	if client == null or not client.has_method("post_integration"):
-		return DotResult.fail(DotError.CODE_STATE, "No backbone client with post_integration.")
+		return GSResult.fail(GSError.CODE_STATE, "No backbone client with post_integration.")
 	if player_key == "" or item_id == "":
-		return DotResult.fail(DotError.CODE_INVALID, "A purchase needs a player and an item.")
+		return GSResult.fail(GSError.CODE_INVALID, "A purchase needs a player and an item.")
 	var body := _query(player_key)
 	body["itemId"] = item_id
 	body["idemKey"] = idem_key if idem_key != "" else "%s:%s:%d:%d" % [player_key, item_id, Time.get_unix_time_from_system(), randi()]
-	var res: DotResult = await client.call("post_integration", PURCHASE_PATH, body)
+	var res: GSResult = await client.call("post_integration", PURCHASE_PATH, body)
 	if not res.ok:
-		DotLog.warn(CHANNEL, "store purchase failed", {"player": player_key, "item": item_id, "error": str(res.error)})
+		GSLog.warn(CHANNEL, "store purchase failed", {"player": player_key, "item": item_id, "error": str(res.error)})
 		return res
-	var applied: DotResult = await ingest(player_key, res.value)
-	return DotResult.success(res.value) if applied.ok else applied
+	var applied: GSResult = await ingest(player_key, res.value)
+	return GSResult.success(res.value) if applied.ok else applied
 
 
 ## Waits for a read when the player's answer is stale (or [param force]); a fresh one is returned as is.
 ## Call on join so the first loadout check sees the site items, not an empty answer.
-func ensure(player_key: String, force: bool = false) -> DotResult:
+func ensure(player_key: String, force: bool = false) -> GSResult:
 	if not force and not _stale(_cache.get(player_key, {})):
-		return DotResult.success(ids_of(player_key))
+		return GSResult.success(ids_of(player_key))
 	while _inflight.has(player_key):
 		await Engine.get_main_loop().process_frame
 	if not force and not _stale(_cache.get(player_key, {})):
-		return DotResult.success(ids_of(player_key))
+		return GSResult.success(ids_of(player_key))
 	return await refresh(player_key)
 
 

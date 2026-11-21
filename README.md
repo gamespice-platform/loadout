@@ -19,27 +19,27 @@ for entry in loadouts.resolve(res.value):
 # Server: a client sent us a new one.
 var published := await loadouts.publish(user_key, submitted)
 if not published.ok:
-    DotLog.warn("game", "loadout refused: %s" % published.error)
+    GSLog.warn("game", "loadout refused: %s" % published.error)
 ```
 
 ## The idea
 
-A loadout maps slot ids to item ids and nothing else: no scenes, meshes or weapon resources. A server receives one from an untrusted client and checks it against a `DotLoadoutSchema` and a `DotLoadoutEntitlements`, on a machine that may have none of the content installed.
+A loadout maps slot ids to item ids and nothing else: no scenes, meshes or weapon resources. A server receives one from an untrusted client and checks it against a `GSLoadoutSchema` and a `GSLoadoutEntitlements`, on a machine that may have none of the content installed.
 
 ## Parts
 
 | Class | What it is |
 | --- | --- |
-| `DotItem` | One thing a player can take: kind, slots, tags, cost, weight, entitlement. |
-| `DotItemCatalogue` | Every item by id, plus an optional client-side resolver that turns one into an asset. |
-| `DotLoadoutSlot` | A position and what fits in it (kinds, required tags, forbidden tags). |
-| `DotLoadoutSchema` | The slots and catalogue for a game mode. Point and weight budgets are off unless the game or `mp_loadout_budget` sets one. |
-| `DotLoadout` | The document. JSON and wire serialisable, with an order-independent digest. |
-| `DotLoadoutEntitlements` | What one player may take. Empty by default. |
-| `DotLoadoutValidator` | `validate` for input from a client, `conform` for loading from a store. |
-| `DotLoadoutStore` | Where loadouts live (memory and local JSON included). |
-| `DotLoadoutManager` | Loading, caching, and the one method a client submission goes through. |
-| `DotPickup`, `DotPickupField` | Items on the floor. Tick-driven, distance-tested, deterministic. |
+| `GSItem` | One thing a player can take: kind, slots, tags, cost, weight, entitlement. |
+| `GSItemCatalogue` | Every item by id, plus an optional client-side resolver that turns one into an asset. |
+| `GSLoadoutSlot` | A position and what fits in it (kinds, required tags, forbidden tags). |
+| `GSLoadoutSchema` | The slots and catalogue for a game mode. Point and weight budgets are off unless the game or `mp_loadout_budget` sets one. |
+| `GSLoadout` | The document. JSON and wire serialisable, with an order-independent digest. |
+| `GSLoadoutEntitlements` | What one player may take. Empty by default. |
+| `GSLoadoutValidator` | `validate` for input from a client, `conform` for loading from a store. |
+| `GSLoadoutStore` | Where loadouts live (memory and local JSON included). |
+| `GSLoadoutManager` | Loading, caching, and the one method a client submission goes through. |
+| `GSPickup`, `GSPickupField` | Items on the floor. Tick-driven, distance-tested, deterministic. |
 
 ## Two defaults worth knowing
 

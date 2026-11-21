@@ -1,8 +1,8 @@
-class_name DotLoadoutRandom
+class_name GSLoadoutRandom
 extends RefCounted
 
 ## The "Random" entry of a loadout menu: a fresh set of items every time it is used, under the
-## server owner's settings. Pure data in, a loadout out; [DotLoadoutCommand] is what asks it.
+## server owner's settings. Pure data in, a loadout out; [GSLoadoutCommand] is what asks it.
 
 const CVAR_ENABLED := "mp_loadout_random"
 const CVAR_COUNT := "mp_loadout_random_count"
@@ -39,17 +39,17 @@ var seed_value: int = 0
 var spawn_mode: int = SPAWN_ALLOWED
 ## Class id to {count, slots, price, spawn} overrides.
 var per_class: Dictionary = {}
-## `func(item: DotItem) -> int`: what an item costs here; unset is its cost.
+## `func(item: GSItem) -> int`: what an item costs here; unset is its cost.
 var price_fn: Callable = Callable()
 
-var _stream: DotRandomStream = null
+var _stream: GSRandomStream = null
 var _stream_seed: int = -1
 
 
 ## Reads the settings from cvar-shaped strings. [param price_text] is free, sum or flat:N;
 ## [param class_text] is `class.count=2 class.slots=primary+secondary class.price=sum`.
 func configure(p_enabled: bool, p_count: int, slots_text: String, price_text: String, p_dupes: bool,
-		p_seed: int, class_text: String, p_spawn: int = SPAWN_ALLOWED) -> DotResult:
+		p_seed: int, class_text: String, p_spawn: int = SPAWN_ALLOWED) -> GSResult:
 	var price := parse_price(price_text)
 	if not price.ok:
 		return price
@@ -65,7 +65,7 @@ func configure(p_enabled: bool, p_count: int, slots_text: String, price_text: St
 	duplicates = p_dupes
 	seed_value = p_seed
 	per_class = classes.value
-	return DotResult.success(self)
+	return GSResult.success(self)
 
 
 static func split_slots(text: String) -> PackedStringArray:
@@ -75,24 +75,24 @@ static func split_slots(text: String) -> PackedStringArray:
 	return out
 
 
-static func parse_price(text: String) -> DotResult:
+static func parse_price(text: String) -> GSResult:
 	var t := text.strip_edges().to_lower()
 	if t == "" or t == PRICE_FREE or t == "0":
-		return DotResult.success({"mode": PRICE_FREE, "flat": 0})
+		return GSResult.success({"mode": PRICE_FREE, "flat": 0})
 	if t == PRICE_SUM:
-		return DotResult.success({"mode": PRICE_SUM, "flat": 0})
+		return GSResult.success({"mode": PRICE_SUM, "flat": 0})
 	if t.begins_with(PRICE_FLAT + ":") and t.substr(5).is_valid_int() and int(t.substr(5)) >= 0:
-		return DotResult.success({"mode": PRICE_FLAT, "flat": int(t.substr(5))})
-	return DotResult.fail(DotError.CODE_INVALID, "'%s' is not free, sum or flat:N." % text)
+		return GSResult.success({"mode": PRICE_FLAT, "flat": int(t.substr(5))})
+	return GSResult.fail(GSError.CODE_INVALID, "'%s' is not free, sum or flat:N." % text)
 
 
-static func parse_classes(text: String) -> DotResult:
+static func parse_classes(text: String) -> GSResult:
 	var out: Dictionary = {}
 	for word in text.strip_edges().split(" ", false):
 		var eq := word.find("=")
 		var dot := word.find(".")
 		if eq <= 0 or dot <= 0 or dot > eq:
-			return DotResult.fail(DotError.CODE_INVALID, "'%s' is not class.setting=value." % word)
+			return GSResult.fail(GSError.CODE_INVALID, "'%s' is not class.setting=value." % word)
 		var cls := word.substr(0, dot).to_lower()
 		var setting := word.substr(dot + 1, eq - dot - 1).to_lower()
 		var value := word.substr(eq + 1)
@@ -100,13 +100,13 @@ static func parse_classes(text: String) -> DotResult:
 		match setting:
 			"count":
 				if not value.is_valid_int():
-					return DotResult.fail(DotError.CODE_INVALID, "'%s': count is a whole number." % word)
+					return GSResult.fail(GSError.CODE_INVALID, "'%s': count is a whole number." % word)
 				entry["count"] = maxi(0, int(value))
 			"slots":
 				entry["slots"] = split_slots(value)
 			"spawn":
 				if not value in ["0", "1", "2"]:
-					return DotResult.fail(DotError.CODE_INVALID, "'%s': spawn is 0 (off), 1 (allowed) or 2 (forced)." % word)
+					return GSResult.fail(GSError.CODE_INVALID, "'%s': spawn is 0 (off), 1 (allowed) or 2 (forced)." % word)
 				entry["spawn"] = int(value)
 			"price":
 				var p := parse_price(value)
@@ -114,9 +114,9 @@ static func parse_classes(text: String) -> DotResult:
 					return p
 				entry["price"] = p.value
 			_:
-				return DotResult.fail(DotError.CODE_INVALID, "'%s': unknown setting '%s'." % [word, setting])
+				return GSResult.fail(GSError.CODE_INVALID, "'%s': unknown setting '%s'." % [word, setting])
 		out[cls] = entry
-	return DotResult.success(out)
+	return GSResult.success(out)
 
 
 ## The settings that apply to [param class_id]: {count, slots, mode, flat}.
@@ -157,33 +157,33 @@ func price_text(class_id: StringName = &"") -> String:
 	return ""
 
 
-func _rng() -> DotRandomStream:
+func _rng() -> GSRandomStream:
 	if _stream == null or _stream_seed != seed_value:
 		_stream_seed = seed_value
 		var s := seed_value if seed_value != 0 else int(Time.get_ticks_usec() ^ (randi() << 16)) | 1
-		_stream = DotRandomStream.new(s, &"loadout_random")
+		_stream = GSRandomStream.new(s, &"loadout_random")
 	return _stream
 
 
-func _price(item: DotItem) -> int:
+func _price(item: GSItem) -> int:
 	return int(price_fn.call(item)) if price_fn.is_valid() else item.cost
 
 
 ## Rolls a new loadout for [param key] from [param current]. [param class_rules] (or null) is what
 ## the player's class may carry; [param money] is -1 for no limit. Returns
 ## {loadout, spent, changed: [slot ids]} or a failure saying why nothing was rolled.
-func roll(manager: DotLoadoutManager, key: String, current: DotLoadout, class_id: StringName = &"",
-		class_rules: DotLoadoutRules = null, money: int = -1) -> DotResult:
+func roll(manager: GSLoadoutManager, key: String, current: GSLoadout, class_id: StringName = &"",
+		class_rules: GSLoadoutRules = null, money: int = -1) -> GSResult:
 	if not enabled:
-		return DotResult.fail(DotError.CODE_STATE, "Random loadouts are off on this server.")
+		return GSResult.fail(GSError.CODE_STATE, "Random loadouts are off on this server.")
 	if manager == null or manager.schema == null:
-		return DotResult.fail(DotError.CODE_STATE, "No loadout schema.")
+		return GSResult.fail(GSError.CODE_STATE, "No loadout schema.")
 	var schema := manager.schema
 	var e := effective(class_id)
 	var flat: bool = e["mode"] == PRICE_FLAT
 	var sum: bool = e["mode"] == PRICE_SUM
 	if flat and money >= 0 and money < int(e["flat"]):
-		return DotResult.fail(DotError.CODE_STATE, "Random costs %d; you have %d." % [e["flat"], money])
+		return GSResult.fail(GSError.CODE_STATE, "Random costs %d; you have %d." % [e["flat"], money])
 	var filter: PackedStringArray = e["slots"]
 	var pool: Array = []
 	for slot in schema.ordered_slots():
@@ -215,17 +215,17 @@ func roll(manager: DotLoadoutManager, key: String, current: DotLoadout, class_id
 			options.append(item)
 		if options.is_empty():
 			continue
-		var item: DotItem = _rng().next_pick(options)
+		var item: GSItem = _rng().next_pick(options)
 		loadout.set_item(slot_id, item.id)
 		if sum:
 			spent += _price(item)
 		changed.append(slot_id)
 	if changed.is_empty():
-		return DotResult.fail(DotError.CODE_STATE, "Nothing could be rolled for you.")
-	return DotResult.success({"loadout": loadout, "spent": spent, "changed": changed})
+		return GSResult.fail(GSError.CODE_STATE, "Nothing could be rolled for you.")
+	return GSResult.success({"loadout": loadout, "spent": spent, "changed": changed})
 
 
-static func _held_elsewhere(loadout: DotLoadout, slot_id: StringName, item_id: StringName) -> bool:
+static func _held_elsewhere(loadout: GSLoadout, slot_id: StringName, item_id: StringName) -> bool:
 	for other in loadout.filled_slots():
 		if other != slot_id and loadout.item_in(other) == item_id:
 			return true

@@ -1,4 +1,4 @@
-class_name DotLoadout
+class_name GSLoadout
 extends RefCounted
 
 ## What a player is taking into a match, as a bounded document.
@@ -13,8 +13,8 @@ extends RefCounted
 ## the wire. A document a client can make arbitrarily large is a document a client can
 ## use to exhaust a server.
 
-# No log channel: a value object and its codecs, which return a DotResult and let the
-# caller -- DotLoadoutManager, which knows the player -- decide what a failure means.
+# No log channel: a value object and its codecs, which return a GSResult and let the
+# caller -- GSLoadoutManager, which knows the player -- decide what a failure means.
 
 ## Most entries one document may hold. Above any real schema; this is a bound against
 ## a hostile client, not a design limit.
@@ -49,8 +49,8 @@ var entries: Dictionary = {}
 var counts: Dictionary = {}
 
 
-static func empty(p_schema_id: StringName = &"") -> DotLoadout:
-	var loadout := DotLoadout.new()
+static func empty(p_schema_id: StringName = &"") -> GSLoadout:
+	var loadout := GSLoadout.new()
 	loadout.schema_id = p_schema_id
 	return loadout
 
@@ -103,8 +103,8 @@ func is_empty() -> bool:
 	return entries.is_empty()
 
 
-func duplicate_loadout() -> DotLoadout:
-	var copy := DotLoadout.new()
+func duplicate_loadout() -> GSLoadout:
+	var copy := GSLoadout.new()
 	copy.schema_id = schema_id
 	copy.catalogue_version = catalogue_version
 	copy.display_name = display_name
@@ -115,7 +115,7 @@ func duplicate_loadout() -> DotLoadout:
 	return copy
 
 
-func equals(other: DotLoadout) -> bool:
+func equals(other: GSLoadout) -> bool:
 	if other == null:
 		return false
 
@@ -170,8 +170,8 @@ func to_dictionary() -> Dictionary:
 ## is trusted: the entry count is bounded, ids are length-checked, and a non-string
 ## value is a refusal rather than a coercion. Coercing is how a client sends
 ## `{"primary": {"$ne": null}}` and finds out what the server does with it.
-static func from_dictionary(data: Dictionary) -> DotResult:
-	var loadout := DotLoadout.new()
+static func from_dictionary(data: Dictionary) -> GSResult:
+	var loadout := GSLoadout.new()
 
 	loadout.schema_id = StringName(str(data.get("schema", "")))
 	loadout.catalogue_version = int(data.get("version", 0))
@@ -186,30 +186,30 @@ static func from_dictionary(data: Dictionary) -> DotResult:
 	var raw: Variant = data.get("entries", {})
 
 	if typeof(raw) != TYPE_DICTIONARY:
-		return DotResult.fail(
-			DotError.CODE_PARSE, "A loadout's entries must be a dictionary."
+		return GSResult.fail(
+			GSError.CODE_PARSE, "A loadout's entries must be a dictionary."
 		)
 
 	var entries_dict: Dictionary = raw
 
 	if entries_dict.size() > MAX_SLOTS:
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"A loadout may hold at most %d entries; this one has %d."
 				% [MAX_SLOTS, entries_dict.size()]
 		)
 
 	for key in entries_dict.keys():
 		if typeof(key) != TYPE_STRING and typeof(key) != TYPE_STRING_NAME:
-			return DotResult.fail(
-				DotError.CODE_PARSE, "A loadout slot key must be a string."
+			return GSResult.fail(
+				GSError.CODE_PARSE, "A loadout slot key must be a string."
 			)
 
 		var value: Variant = entries_dict[key]
 
 		if typeof(value) != TYPE_STRING and typeof(value) != TYPE_STRING_NAME:
-			return DotResult.fail(
-				DotError.CODE_PARSE,
+			return GSResult.fail(
+				GSError.CODE_PARSE,
 				"The item in slot '%s' must be a string." % str(key)
 			)
 
@@ -217,8 +217,8 @@ static func from_dictionary(data: Dictionary) -> DotResult:
 		var item_id := str(value)
 
 		if slot_id.length() > MAX_ID_BYTES or item_id.length() > MAX_ID_BYTES:
-			return DotResult.fail(
-				DotError.CODE_INVALID,
+			return GSResult.fail(
+				GSError.CODE_INVALID,
 				"An id in a loadout is longer than %d characters." % MAX_ID_BYTES
 			)
 
@@ -234,14 +234,14 @@ static func from_dictionary(data: Dictionary) -> DotResult:
 				continue
 			loadout.counts[slot] = clampi(int(counts_dict[key]), 1, 999)
 
-	return DotResult.success(loadout)
+	return GSResult.success(loadout)
 
 
-static func from_json(text: String) -> DotResult:
+static func from_json(text: String) -> GSResult:
 	var parsed: Variant = JSON.parse_string(text)
 
 	if typeof(parsed) != TYPE_DICTIONARY:
-		return DotResult.fail(DotError.CODE_PARSE, "A loadout must be a JSON object.")
+		return GSResult.fail(GSError.CODE_PARSE, "A loadout must be a JSON object.")
 
 	return from_dictionary(parsed)
 
@@ -252,7 +252,7 @@ func to_json() -> String:
 
 # --- Wire ------------------------------------------------------------------
 
-## Writes to a [code]DotNetWriter[/code].
+## Writes to a [code]GSNetWriter[/code].
 ##
 ## [param writer] is [Variant] so this file never mentions a GameSpice Net class name — a
 ## script that does fails to parse in a project without GameSpice Net installed, and takes
@@ -278,9 +278,9 @@ func write(writer: Variant) -> void:
 		writer.write_uint(clampi(count_in(slot, 0), 0, 1023), 10)
 
 
-## Reads from a [code]DotNetReader[/code]. Returns a failure on a malformed stream.
-static func read(reader: Variant) -> DotResult:
-	var loadout := DotLoadout.new()
+## Reads from a [code]GSNetReader[/code]. Returns a failure on a malformed stream.
+static func read(reader: Variant) -> GSResult:
+	var loadout := GSLoadout.new()
 
 	loadout.schema_id = StringName(reader.read_string(MAX_ID_BYTES))
 	loadout.catalogue_version = reader.read_uint(16)
@@ -288,11 +288,11 @@ static func read(reader: Variant) -> DotResult:
 	var count: int = reader.read_uint(6)
 
 	if not reader.ok():
-		return DotResult.fail(DotError.CODE_PARSE, "Truncated loadout header.")
+		return GSResult.fail(GSError.CODE_PARSE, "Truncated loadout header.")
 
 	if count > MAX_SLOTS:
-		return DotResult.fail(
-			DotError.CODE_INVALID, "A loadout claiming %d entries." % count
+		return GSResult.fail(
+			GSError.CODE_INVALID, "A loadout claiming %d entries." % count
 		)
 
 	for _index in range(count):
@@ -304,7 +304,7 @@ static func read(reader: Variant) -> DotResult:
 		var amount: int = reader.read_uint(10)
 
 		if not reader.ok():
-			return DotResult.fail(DotError.CODE_PARSE, "Truncated loadout entry.")
+			return GSResult.fail(GSError.CODE_PARSE, "Truncated loadout entry.")
 
 		if slot == "" or item == "":
 			continue
@@ -314,7 +314,7 @@ static func read(reader: Variant) -> DotResult:
 		if amount > 0:
 			loadout.counts[StringName(slot)] = amount
 
-	return DotResult.success(loadout)
+	return GSResult.success(loadout)
 
 
 ## A stable fingerprint of the contents.
@@ -331,7 +331,7 @@ func digest() -> String:
 	for slot in filled_slots():
 		parts.append("%s=%s:%d" % [slot, entries[slot], count_in(slot, 0)])
 
-	return DotHash.sha256_text("\n".join(parts))
+	return GSHash.sha256_text("\n".join(parts))
 
 
 func describe() -> Dictionary:
@@ -362,4 +362,4 @@ func describe_lines() -> PackedStringArray:
 
 
 func _to_string() -> String:
-	return "DotLoadout(%s, %d slots)" % [schema_id, size()]
+	return "GSLoadout(%s, %d slots)" % [schema_id, size()]

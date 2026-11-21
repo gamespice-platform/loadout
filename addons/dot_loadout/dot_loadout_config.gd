@@ -1,8 +1,8 @@
 @tool
-class_name DotLoadoutConfig
-extends DotConfig
+class_name GSLoadoutConfig
+extends GSConfig
 
-## Everything configurable about loadouts. Layered like every [DotConfig]: exported
+## Everything configurable about loadouts. Layered like every [GSConfig]: exported
 ## defaults, then a JSON file, then [code]DOT_LOADOUT_*[/code] environment variables,
 ## then [code]--loadout-*[/code] arguments.
 
@@ -55,7 +55,7 @@ extends DotConfig
 
 @export_group("Limits")
 
-## Saved loadouts one player may keep; 0 is unlimited (the store's own bound, [constant DotLoadout.MAX_SAVED]).
+## Saved loadouts one player may keep; 0 is unlimited (the store's own bound, [constant GSLoadout.MAX_SAVED]).
 ## A server sets it with the `mp_loadout_max_saved` cvar.
 @export_range(0, 256, 1) var max_per_player: int = 0
 
@@ -115,17 +115,17 @@ extends DotConfig
 
 ## The strict pin from [member site_public_key] or [member site_public_key_path]; "" means none is set
 ## and the site's key list is followed. Fails only on a set but unusable pin.
-func site_key() -> DotResult:
+func site_key() -> GSResult:
 	if site_public_key != "" and site_public_key_path != "":
-		return DotResult.fail(DotError.CODE_INVALID, "Set site_public_key or site_public_key_path, not both.")
+		return GSResult.fail(GSError.CODE_INVALID, "Set site_public_key or site_public_key_path, not both.")
 	if site_public_key_path != "":
 		if not FileAccess.file_exists(site_public_key_path):
-			return DotResult.fail(DotError.CODE_IO, "site_public_key_path does not exist: %s (clear it to follow the site's key list)" % site_public_key_path)
+			return GSResult.fail(GSError.CODE_IO, "site_public_key_path does not exist: %s (clear it to follow the site's key list)" % site_public_key_path)
 		var text := FileAccess.get_file_as_string(site_public_key_path).strip_edges()
 		if text == "":
-			return DotResult.fail(DotError.CODE_INVALID, "site_public_key_path is empty: %s (clear it to follow the site's key list)" % site_public_key_path)
-		return DotResult.success(text)
-	return DotResult.success(site_public_key.strip_edges())
+			return GSResult.fail(GSError.CODE_INVALID, "site_public_key_path is empty: %s (clear it to follow the site's key list)" % site_public_key_path)
+		return GSResult.success(text)
+	return GSResult.success(site_public_key.strip_edges())
 
 
 ## True when a strict pin is configured, false when the site's key list is followed.
@@ -141,25 +141,25 @@ func cli_prefix() -> String:
 	return "--loadout-"
 
 
-func validate() -> DotResult:
+func validate() -> GSResult:
 	if backend == "local" and directory.strip_edges() == "":
-		return DotResult.fail(
-			DotError.CODE_INVALID, "The local backend needs a directory."
+		return GSResult.fail(
+			GSError.CODE_INVALID, "The local backend needs a directory."
 		)
 
 	if not enforce_entitlements:
 		# Loud, because it is the one setting here that turns off a security control
 		# and the symptom is players carrying things they have not unlocked, which
 		# nobody reports as a bug.
-		DotLog.warn(
+		GSLog.warn(
 			"loadout.config",
 			"enforce_entitlements is off; any loadout will be accepted"
 		)
 
 	if site_public_key != "" and site_public_key_path != "":
-		return DotResult.fail(DotError.CODE_INVALID, "Set site_public_key or site_public_key_path, not both.")
+		return GSResult.fail(GSError.CODE_INVALID, "Set site_public_key or site_public_key_path, not both.")
 
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
 func describe_summary() -> String:

@@ -1,8 +1,8 @@
 @tool
-class_name DotPickupField
+class_name GSPickupField
 extends Node
 
-## Every [DotPickup] in a level, ticked together.
+## Every [GSPickup] in a level, ticked together.
 ##
 ## Collecting them here rather than having each one run its own `_physics_process` is
 ## not a micro-optimisation: a pickup that ticks itself ticks on whatever schedule the
@@ -17,12 +17,12 @@ extends Node
 const CHANNEL := "loadout.pickups"
 
 ## Someone took something. Carries the pickup so a handler can read what it held.
-signal collected(pickup: DotPickup, taker: int, tick: int)
+signal collected(pickup: GSPickup, taker: int, tick: int)
 
 @export_group("Wiring")
 
 ## Where the pickups live. Empty collects from this node's own children.
-@export var container_ref: DotNodeRef = null
+@export var container_ref: GSNodeRef = null
 
 @export_group("Simulation")
 
@@ -36,16 +36,16 @@ signal collected(pickup: DotPickup, taker: int, tick: int)
 ## has.
 @export var is_authority: bool = true
 
-var _pickups: Array[DotPickup] = []
+var _pickups: Array[GSPickup] = []
 
-## `func(taker: int, pickup: DotPickup) -> bool`. Whether the taker has room.
+## `func(taker: int, pickup: GSPickup) -> bool`. Whether the taker has room.
 ##
-## Left unset every pickup is wanted, which makes [member DotPickup.allow_wasteful_pickup]
+## Left unset every pickup is wanted, which makes [member GSPickup.allow_wasteful_pickup]
 ## irrelevant — so a game with health packs should wire it.
 var wants_fn: Callable = Callable()
 
 ## `func(taker: int) -> Array[StringName]`. The taker's tags, for
-## [member DotPickup.require_tags]. Left unset, tag requirements are ignored.
+## [member GSPickup.require_tags]. Left unset, tag requirements are ignored.
 var tags_fn: Callable = Callable()
 
 var _collected: int = 0
@@ -73,17 +73,17 @@ func refresh() -> void:
 	for pickup in _pickups:
 		pickup.set_tick_rate(tick_rate)
 
-	DotLog.debug(CHANNEL, "pickups collected", {"count": _pickups.size()})
+	GSLog.debug(CHANNEL, "pickups collected", {"count": _pickups.size()})
 
 
 func _collect(node: Node) -> void:
 	for child in node.get_children():
-		if child is DotPickup:
+		if child is GSPickup:
 			_pickups.append(child)
 		_collect(child)
 
 
-func pickups() -> Array[DotPickup]:
+func pickups() -> Array[GSPickup]:
 	_prune()
 	return _pickups
 
@@ -114,9 +114,9 @@ func tick(current_tick: int) -> int:
 ## Returns what was actually taken. Order is declaration order, which is stable across
 ## machines — sorting by distance would be nicer and is not worth a per-call sort on
 ## something that runs once per player per tick.
-func sweep(taker: int, position: Vector3, current_tick: int) -> Array[DotPickup]:
+func sweep(taker: int, position: Vector3, current_tick: int) -> Array[GSPickup]:
 	_prune()
-	var out: Array[DotPickup] = []
+	var out: Array[GSPickup] = []
 
 	for pickup in _pickups:
 		if not pickup.available:
@@ -150,7 +150,7 @@ func sweep(taker: int, position: Vector3, current_tick: int) -> Array[DotPickup]
 	return out
 
 
-func _tags_allow(taker: int, pickup: DotPickup) -> bool:
+func _tags_allow(taker: int, pickup: GSPickup) -> bool:
 	if pickup.require_tags.is_empty():
 		return true
 

@@ -18,7 +18,7 @@ Thumbs.db
 # dot-cloud is optional here; link or copy it to run the real Ed25519 token check.
 /addons/dot_cloud
 
-# dot-save: the file stores sit on DotSaveStoreFile. For local development, symlink it:
+# dot-save: the file stores sit on GSSaveStoreFile. For local development, symlink it:
 #   ln -s ../../dot-save/addons/dot_save addons/dot_save
 # Consumers copy it into their own project beside dot_core.
 /addons/dot_save

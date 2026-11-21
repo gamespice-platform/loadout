@@ -1,5 +1,5 @@
 @tool
-class_name DotItemCatalogue
+class_name GSItemCatalogue
 extends Resource
 
 ## Every item a game knows about, by id.
@@ -17,21 +17,21 @@ const CHANNEL := "loadout.catalogue"
 @export var id: StringName = &"items"
 
 ## Bumped when items change in a way that invalidates saved loadouts. Carried by a
-## [DotLoadout] so a mismatch is visible rather than mysterious.
+## [GSLoadout] so a mismatch is visible rather than mysterious.
 @export_range(1, 100000, 1) var version: int = 1
 
-@export var items: Array[DotItem] = []
+@export var items: Array[GSItem] = []
 
-## `func(item: DotItem) -> Variant`. Turns an item into whatever the game needs — a
-## `PackedScene`, a `DotWeaponDef`, a texture. Never called by validation.
+## `func(item: GSItem) -> Variant`. Turns an item into whatever the game needs — a
+## `PackedScene`, a `GSWeaponDef`, a texture. Never called by validation.
 var resolver: Callable = Callable()
 
 var _by_id: Dictionary = {}
 var _indexed: bool = false
 
 
-static func of(p_items: Array[DotItem]) -> DotItemCatalogue:
-	var catalogue := DotItemCatalogue.new()
+static func of(p_items: Array[GSItem]) -> GSItemCatalogue:
+	var catalogue := GSItemCatalogue.new()
 	catalogue.items = p_items
 	return catalogue
 
@@ -47,7 +47,7 @@ func reindex() -> void:
 		if _by_id.has(item.id):
 			# Silently keeping the first is how a duplicate id turns into "that gun
 			# has the wrong stats" three months later.
-			DotLog.warn(
+			GSLog.warn(
 				CHANNEL, "duplicate item id, the later one wins",
 				{"id": String(item.id)}
 			)
@@ -62,7 +62,7 @@ func _ensure_indexed() -> void:
 		reindex()
 
 
-func find(item_id: StringName) -> DotItem:
+func find(item_id: StringName) -> GSItem:
 	_ensure_indexed()
 	return _by_id.get(item_id)
 
@@ -89,7 +89,7 @@ func ids() -> Array[StringName]:
 
 ## Download every pack this catalogue's items live in.
 ##
-## [b]Nothing used to fetch these.[/b] [DotItem] has carried a `content_id` and a
+## [b]Nothing used to fetch these.[/b] [GSItem] has carried a `content_id` and a
 ## fallback for it since it was written, and no code anywhere asked GameSpice Cloud for one —
 ## so a delivered item resolved to its fallback for the life of the process, which is
 ## the designed behaviour for content that has not arrived and therefore says nothing
@@ -101,78 +101,78 @@ func ids() -> Array[StringName]:
 ## join path to decide something it can already decide.
 ##
 ## Non-fatal: a pack that will not download leaves those items on their fallbacks.
-func ensure_content() -> DotResult:
+func ensure_content() -> GSResult:
 	var ids := PackedStringArray()
 
 	for item in items:
 		if item != null and item.content_id.strip_edges() != "":
 			ids.append(item.content_id)
 
-	return await DotContent.ensure_all(ids)
+	return await GSContent.ensure_all(ids)
 
 
 ## Every item of a kind, in declaration order.
-func of_kind(kind: StringName) -> Array[DotItem]:
-	var out: Array[DotItem] = []
+func of_kind(kind: StringName) -> Array[GSItem]:
+	var out: Array[GSItem] = []
 	for item in items:
 		if item != null and item.kind == kind:
 			out.append(item)
 	return out
 
 
-func with_tag(tag: StringName) -> Array[DotItem]:
-	var out: Array[DotItem] = []
+func with_tag(tag: StringName) -> Array[GSItem]:
+	var out: Array[GSItem] = []
 	for item in items:
 		if item != null and item.has_tag(tag):
 			out.append(item)
 	return out
 
 
-## Resolves an item to its asset, following [member DotItem.fallback_id] when the
+## Resolves an item to its asset, following [member GSItem.fallback_id] when the
 ## content is not available.
 ##
 ## Returns a failure rather than null so a caller cannot mistake "not downloaded yet"
 ## for "no such item" — the first is temporary and the second is a bug.
-func resolve(item_id: StringName) -> DotResult:
+func resolve(item_id: StringName) -> GSResult:
 	var item := find(item_id)
 
 	if item == null:
-		return DotResult.fail(
-			DotError.CODE_INVALID, "No item '%s' in catalogue '%s'." % [item_id, id]
+		return GSResult.fail(
+			GSError.CODE_INVALID, "No item '%s' in catalogue '%s'." % [item_id, id]
 		)
 
 	if not resolver.is_valid():
-		return DotResult.fail(
-			DotError.CODE_STATE,
+		return GSResult.fail(
+			GSError.CODE_STATE,
 			"Catalogue '%s' has no resolver; a server does not need one." % id
 		)
 
 	var asset: Variant = resolver.call(item)
 
 	if asset != null:
-		return DotResult.success(asset)
+		return GSResult.success(asset)
 
 	if item.fallback_id != &"" and item.fallback_id != item_id:
 		return resolve(item.fallback_id)
 
-	return DotResult.fail(
-		DotError.CODE_IO,
+	return GSResult.fail(
+		GSError.CODE_IO,
 		"Item '%s' could not be resolved and has no usable fallback." % item_id
 	)
 
 
-func validate() -> DotResult:
+func validate() -> GSResult:
 	reindex()
 
 	if items.is_empty():
-		return DotResult.fail(
-			DotError.CODE_INVALID, "Catalogue '%s' is empty." % id
+		return GSResult.fail(
+			GSError.CODE_INVALID, "Catalogue '%s' is empty." % id
 		)
 
 	for item in items:
 		if item == null:
-			return DotResult.fail(
-				DotError.CODE_INVALID, "Catalogue '%s' holds a null item." % id
+			return GSResult.fail(
+				GSError.CODE_INVALID, "Catalogue '%s' holds a null item." % id
 			)
 
 		var res := item.validate()
@@ -181,13 +181,13 @@ func validate() -> DotResult:
 			return res
 
 		if item.fallback_id != &"" and not _by_id.has(item.fallback_id):
-			return DotResult.fail(
-				DotError.CODE_INVALID,
+			return GSResult.fail(
+				GSError.CODE_INVALID,
 				"Item '%s' falls back to '%s', which is not in the catalogue."
 					% [item.id, item.fallback_id]
 			)
 
-	return DotResult.success(size())
+	return GSResult.success(size())
 
 
 func describe() -> Dictionary:
@@ -201,4 +201,4 @@ func describe() -> Dictionary:
 
 
 func _to_string() -> String:
-	return "DotItemCatalogue(%s, %d items)" % [id, size()]
+	return "GSItemCatalogue(%s, %d items)" % [id, size()]

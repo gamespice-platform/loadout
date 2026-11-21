@@ -1,5 +1,5 @@
 @tool
-class_name DotLoadoutManager
+class_name GSLoadoutManager
 extends Node
 
 ## Loads, validates and saves what players take into a match.
@@ -9,7 +9,7 @@ extends Node
 ## document the game will act on, and it is the only place both the schema and the
 ## entitlements are in scope at once.
 ##
-## [b]No autoload.[/b] It registers itself in [DotRegistry] under [constant SERVICE].
+## [b]No autoload.[/b] It registers itself in [GSRegistry] under [constant SERVICE].
 ## A process running a server and a client at once needs two of these, and
 ## [member service_scope] is how they coexist.
 
@@ -20,20 +20,20 @@ const SERVICE := &"dot_loadout"
 signal loadouts_changed(user_key: String)
 
 ## A published loadout was repaired on its way in. [param changes] is an
-## [code]Array[DotLoadoutValidator.Change][/code].
+## [code]Array[GSLoadoutValidator.Change][/code].
 signal loadout_conformed(user_key: String, changes: Array)
 
 ## A published loadout was refused. The reason is for logs and admin tools.
 signal loadout_refused(user_key: String, reason: String)
 
 ## The server owner's rules changed ([member rules]).
-signal rules_changed(rules: DotLoadoutRules)
+signal rules_changed(rules: GSLoadoutRules)
 ## A menu asked to get a locked item: [param url] is [member store_url] (may be empty).
 signal store_requested(item_id: StringName, url: String)
 
 @export_group("Configuration")
 
-@export var config: DotLoadoutConfig = null
+@export var config: GSLoadoutConfig = null
 
 @export var config_file: String = "user://cfg/loadout.json"
 
@@ -42,7 +42,7 @@ signal store_requested(item_id: StringName, url: String)
 @export_group("Rules")
 
 ## The schema every loadout is validated against. Required.
-@export var schema: DotLoadoutSchema = null
+@export var schema: GSLoadoutSchema = null
 
 @export_group("Service")
 
@@ -51,12 +51,12 @@ signal store_requested(item_id: StringName, url: String)
 @export var service_scope: StringName = &""
 
 ## Where loadouts are read and written. Built from [member config] at setup if null.
-var store: DotLoadoutStore = null
+var store: GSLoadoutStore = null
 
-## Where "Get in store" points for a locked item (the same idea as DotGameStorePanel's store URL); empty hides the hint.
+## Where "Get in store" points for a locked item (the same idea as GSGameStorePanel's store URL); empty hides the hint.
 var store_url: String = ""
 
-## `func(user_key: String) -> DotLoadoutEntitlements`.
+## `func(user_key: String) -> GSLoadoutEntitlements`.
 ##
 ## [b]Left unset, every player is entitled to nothing but the free items.[/b] That is
 ## deliberate: an unwired server that refused everything is loud and gets fixed in a
@@ -64,16 +64,16 @@ var store_url: String = ""
 ## is free.
 var entitlement_source: Callable = Callable()
 
-## What the server owner allows ([DotLoadoutRules]): whether players choose, which items each slot
+## What the server owner allows ([GSLoadoutRules]): whether players choose, which items each slot
 ## may hold, the slots the server fills. Null is no restriction. Set through [method set_rules] so
-## [signal rules_changed] fires; [DotLoadoutCommand] does it from the `mp_loadout_*` cvars.
+## [signal rules_changed] fires; [GSLoadoutCommand] does it from the `mp_loadout_*` cvars.
 ##
 ## [b]Applied on the way out, never written into a stored loadout.[/b] [method active_for] hands
 ## back a conformed copy, so an owner who relaxes a rule tonight gives every player back the choice
 ## they saved last week rather than the repair made while the rule was on.
-var rules: DotLoadoutRules = null
+var rules: GSLoadoutRules = null
 
-## user key -> Array[DotLoadout].
+## user key -> Array[GSLoadout].
 var _cache: Dictionary = {}
 
 ## user key -> index of the loadout in force.
@@ -90,14 +90,14 @@ var _idle_since: Dictionary = {}
 ## Their first publish replaces it instead of adding alongside it — see [method publish].
 var _synthesised: Dictionary = {}
 
-var _publish_limiter: DotRateLimiter = null
+var _publish_limiter: GSRateLimiter = null
 var _registered_name: StringName = &""
 
 
-func _make_store() -> DotLoadoutStore:
+func _make_store() -> GSLoadoutStore:
 	if config.backend == "memory":
-		return DotLoadoutStoreMemory.new()
-	var local := DotLoadoutStoreLocal.at(config.directory)
+		return GSLoadoutStoreMemory.new()
+	var local := GSLoadoutStoreLocal.at(config.directory)
 	local.max_file_bytes = config.store_max_bytes
 	local.max_files = config.store_max_files
 	return local
@@ -110,21 +110,21 @@ func _ready() -> void:
 	var res := setup()
 
 	if not res.ok:
-		DotLog.result(CHANNEL, "loadout setup", res)
+		GSLog.result(CHANNEL, "loadout setup", res)
 
 
 func _exit_tree() -> void:
 	if _registered_name != &"":
-		DotRegistry.unregister_instance(_registered_name, self)
+		GSRegistry.unregister_instance(_registered_name, self)
 		_registered_name = &""
 
 	if store != null:
 		store.close()
 
 
-func setup() -> DotResult:
+func setup() -> GSResult:
 	if config == null:
-		config = DotLoadoutConfig.new()
+		config = GSLoadoutConfig.new()
 
 	if load_layered_config:
 		var loaded := config.load_layered(config_file)
@@ -137,8 +137,8 @@ func setup() -> DotResult:
 		return valid
 
 	if schema == null:
-		return DotResult.fail(
-			DotError.CODE_STATE,
+		return GSResult.fail(
+			GSError.CODE_STATE,
 			"A loadout manager needs a schema; without one it cannot validate anything."
 		)
 
@@ -154,20 +154,20 @@ func setup() -> DotResult:
 	# screen changes several slots and submits, and a burst so small that the second
 	# submission is throttled reads as a broken screen. A refused publish still spends
 	# a token — that is the point, since spamming invalid loadouts is the abuse.
-	_publish_limiter = DotRateLimiter.new(
+	_publish_limiter = GSRateLimiter.new(
 		float(config.publishes_per_minute) / 60.0,
 		maxf(4.0, float(config.publishes_per_minute) / 3.0)
 	)
 
 	if register_service:
 		_registered_name = (
-			DotRegistry.scoped_name(SERVICE, service_scope)
+			GSRegistry.scoped_name(SERVICE, service_scope)
 			if service_scope != &""
 			else SERVICE
 		)
-		DotRegistry.register(_registered_name, self)
+		GSRegistry.register(_registered_name, self)
 
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
 # --- Entitlements ----------------------------------------------------------
@@ -175,23 +175,23 @@ func setup() -> DotResult:
 ## What a player is allowed to take.
 ##
 ## Never returns null: an unwired source produces an empty set, which permits only
-## items marked [member DotItem.free].
-func entitlements_for(user_key: String) -> DotLoadoutEntitlements:
+## items marked [member GSItem.free].
+func entitlements_for(user_key: String) -> GSLoadoutEntitlements:
 	if not config.enforce_entitlements:
-		return DotLoadoutEntitlements.everything()
+		return GSLoadoutEntitlements.everything()
 
 	if not entitlement_source.is_valid():
-		return DotLoadoutEntitlements.none()
+		return GSLoadoutEntitlements.none()
 
 	var value: Variant = entitlement_source.call(user_key)
 
-	if value is DotLoadoutEntitlements:
+	if value is GSLoadoutEntitlements:
 		return value
 
 	if value is Array:
-		return DotLoadoutEntitlements.of(value as Array)
+		return GSLoadoutEntitlements.of(value as Array)
 
-	return DotLoadoutEntitlements.none()
+	return GSLoadoutEntitlements.none()
 
 
 # --- Loading ---------------------------------------------------------------
@@ -201,28 +201,28 @@ func entitlements_for(user_key: String) -> DotLoadoutEntitlements:
 ## A store failure is [b]not[/b] a reason to hand back defaults: that would overwrite
 ## a player's real loadouts with a blank the moment the store hiccups, and the next
 ## publish would make it permanent. The failure comes back as a failure.
-func load_for(user_key: String) -> DotResult:
+func load_for(user_key: String) -> GSResult:
 	if _cache.has(user_key):
 		_idle_since.erase(user_key)
-		return DotResult.success(_cache[user_key])
+		return GSResult.success(_cache[user_key])
 
-	var res: DotResult = await store.fetch(user_key)
+	var res: GSResult = await store.fetch(user_key)
 
 	if not res.ok:
 		return res.wrap("Could not load loadouts for this player.")
 
-	var loadouts: Array[DotLoadout] = []
+	var loadouts: Array[GSLoadout] = []
 	var value: Variant = res.value_or(null)
 
 	if value is Array:
 		for entry in (value as Array):
-			if entry is DotLoadout:
+			if entry is GSLoadout:
 				loadouts.append(entry)
 
 	if loadouts.is_empty():
 		if not config.allow_default_loadout:
 			_cache[user_key] = loadouts
-			return DotResult.success(loadouts)
+			return GSResult.success(loadouts)
 
 		loadouts.append(schema.default_loadout())
 		_synthesised[user_key] = true
@@ -237,12 +237,12 @@ func load_for(user_key: String) -> DotResult:
 		var entitlements := entitlements_for(user_key)
 
 		for loadout in loadouts:
-			var changes := DotLoadoutValidator.conform(loadout, schema, entitlements)
+			var changes := GSLoadoutValidator.conform(loadout, schema, entitlements)
 
 			if not changes.is_empty():
 				# "Where did my gun go" -- a retired item or a tightened budget changed a
 				# saved loadout on the way in. DEBUG: the repair is the design working.
-				DotLog.debug(CHANNEL, "a saved loadout was repaired on load", {
+				GSLog.debug(CHANNEL, "a saved loadout was repaired on load", {
 					"key": user_key,
 					"changes": ", ".join(changes.map(func(c: Variant) -> String: return str(c))),
 				})
@@ -252,14 +252,14 @@ func load_for(user_key: String) -> DotResult:
 	_idle_since.erase(user_key)
 	loadouts_changed.emit(user_key)
 
-	return DotResult.success(loadouts)
+	return GSResult.success(loadouts)
 
 
 ## The loadout a player will spawn with. Loads them if needed.
 ##
 ## Under restricting [member rules] this is a conformed COPY of the saved one (see [member rules]).
-func active_for(user_key: String) -> DotResult:
-	var res: DotResult = await load_for(user_key)
+func active_for(user_key: String) -> GSResult:
+	var res: GSResult = await load_for(user_key)
 
 	if not res.ok:
 		return res
@@ -271,30 +271,30 @@ func active_for(user_key: String) -> DotResult:
 			# Defaults off, but the owner fixed slots or turned choosing off: what the owner said
 			# is still a loadout to spawn with.
 			var made := schema.default_loadout()
-			var _c := DotLoadoutValidator.conform(made, schema, entitlements_for(user_key), rules)
+			var _c := GSLoadoutValidator.conform(made, schema, entitlements_for(user_key), rules)
 			if not made.is_empty():
-				return DotResult.success(made)
-		return DotResult.fail(
-			DotError.CODE_STATE, "This player has no loadout and defaults are off."
+				return GSResult.success(made)
+		return GSResult.fail(
+			GSError.CODE_STATE, "This player has no loadout and defaults are off."
 		)
 
 	var index := clampi(int(_selected.get(user_key, 0)), 0, loadouts.size() - 1)
-	var chosen: DotLoadout = loadouts[index]
+	var chosen: GSLoadout = loadouts[index]
 	if rules == null or not rules.restricts():
-		return DotResult.success(chosen)
+		return GSResult.success(chosen)
 	# Choosing off: the schema's defaults, over which the fixed slots apply. A saved loadout is
 	# kept for when the owner turns it back on.
 	var out := schema.default_loadout() if not rules.choose else chosen.duplicate_loadout()
-	var _changes := DotLoadoutValidator.conform(out, schema, entitlements_for(user_key), rules)
-	return DotResult.success(out)
+	var _changes := GSLoadoutValidator.conform(out, schema, entitlements_for(user_key), rules)
+	return GSResult.success(out)
 
 
 ## Replaces [member rules] and says so. Null is no restriction. Does not check them: call
-## [method DotLoadoutRules.check] first, which [DotLoadoutCommand] does, and keep the old rules on a
+## [method GSLoadoutRules.check] first, which [GSLoadoutCommand] does, and keep the old rules on a
 ## failure.
-func set_rules(new_rules: DotLoadoutRules) -> void:
+func set_rules(new_rules: GSLoadoutRules) -> void:
 	rules = new_rules
-	DotLog.info(CHANNEL, "loadout rules", rules.describe() if rules != null else {"restricts": false})
+	GSLog.info(CHANNEL, "loadout rules", rules.describe() if rules != null else {"restricts": false})
 	rules_changed.emit(rules)
 
 
@@ -305,7 +305,7 @@ func players_choose() -> bool:
 
 ## What [param user_key] may put in [param slot_id] now: the schema's choices, less what they have
 ## not unlocked and what the owner does not permit. What a loadout screen lists.
-func choices_for(user_key: String, slot_id: StringName) -> Array[DotItem]:
+func choices_for(user_key: String, slot_id: StringName) -> Array[GSItem]:
 	if schema == null:
 		return []
 	return schema.choices_for(slot_id, entitlements_for(user_key), rules)
@@ -328,11 +328,11 @@ func choices_for(user_key: String, slot_id: StringName) -> Array[DotItem]:
 ##
 ## Ids, names and numbers only: art and statistics are the client's to add from its own content,
 ## because a dedicated server may have none.
-func offer_for(user_key: String, include_locked: bool = false) -> DotResult:
+func offer_for(user_key: String, include_locked: bool = false) -> GSResult:
 	if schema == null or schema.catalogue == null:
-		return DotResult.fail(DotError.CODE_STATE, "No loadout schema.")
-	var active: DotResult = await active_for(user_key)
-	var current: DotLoadout = active.value if active.ok else schema.default_loadout()
+		return GSResult.fail(GSError.CODE_STATE, "No loadout schema.")
+	var active: GSResult = await active_for(user_key)
+	var current: GSLoadout = active.value if active.ok else schema.default_loadout()
 	var entitlements := entitlements_for(user_key)
 	var choose := players_choose()
 	var slots: Array = []
@@ -356,13 +356,13 @@ func offer_for(user_key: String, include_locked: bool = false) -> DotResult:
 		note = "The server sets every loadout here."
 	elif rules != null and not rules.allowed.is_empty():
 		note = "This server limits what you can carry."
-	return DotResult.success({
+	return GSResult.success({
 		"choose": choose, "schema": String(schema.id), "budget": schema.effective_budget(rules),
 		"points": schema.points_used(current), "priced": priced, "note": note, "slots": slots,
 	})
 
 
-func _lock_fields(item: DotItem, entitlements: DotLoadoutEntitlements) -> Dictionary:
+func _lock_fields(item: GSItem, entitlements: GSLoadoutEntitlements) -> Dictionary:
 	var locked := not (entitlements != null and entitlements.allows(item))
 	return {"locked": locked, "store": store_url if locked else ""}
 
@@ -374,22 +374,22 @@ func request_store(item_id: StringName) -> String:
 
 
 ## Makes loadout [param index] the one the player spawns with, and keeps that across restarts.
-func select(user_key: String, index: int) -> DotResult:
+func select(user_key: String, index: int) -> GSResult:
 	var loadouts: Array = _cache.get(user_key, [])
 
 	if index < 0 or index >= loadouts.size():
-		return DotResult.fail(
-			DotError.CODE_INVALID, "No loadout %d for this player." % index
+		return GSResult.fail(
+			GSError.CODE_INVALID, "No loadout %d for this player." % index
 		)
 
 	_selected[user_key] = index
 	_flag_selected(loadouts, index, user_key)
 	if not bool(_synthesised.get(user_key, false)):
-		var saved: DotResult = await store.store(user_key, _typed(loadouts))
+		var saved: GSResult = await store.store(user_key, _typed(loadouts))
 		if not saved.ok:
 			return saved.wrap("Could not save the choice.")
 	loadouts_changed.emit(user_key)
-	return DotResult.success(index)
+	return GSResult.success(index)
 
 
 func selected_index(user_key: String) -> int:
@@ -415,13 +415,13 @@ func selected_index(user_key: String) -> int:
 ## which is a different feature from the one being offered.
 func publish(
 	user_key: String,
-	loadout: DotLoadout,
+	loadout: GSLoadout,
 	index: int = -1
-) -> DotResult:
+) -> GSResult:
 	if loadout == null:
 		return _refuse(user_key, "no loadout")
 
-	if not DotLoadoutKey.is_usable(user_key):
+	if not GSLoadoutKey.is_usable(user_key):
 		return _refuse(user_key, "unusable player key")
 
 	if config.read_only:
@@ -437,20 +437,20 @@ func publish(
 	# a screen built before the owner fixed a slot still saves the slots it may choose.
 	if rules != null and not rules.fixed.is_empty():
 		loadout = loadout.duplicate_loadout()
-		var _fixed := DotLoadoutValidator.apply_fixed(loadout, schema, rules)
+		var _fixed := GSLoadoutValidator.apply_fixed(loadout, schema, rules)
 
 	var entitlements := entitlements_for(user_key)
-	var valid := DotLoadoutValidator.validate(loadout, schema, entitlements, rules)
+	var valid := GSLoadoutValidator.validate(loadout, schema, entitlements, rules)
 
 	if not valid.ok:
 		loadout_refused.emit(user_key, str(valid.error))
 		return valid
 
 	var existing: Array = _cache.get(user_key, [])
-	var loadouts: Array[DotLoadout] = []
+	var loadouts: Array[GSLoadout] = []
 
 	for entry in existing:
-		loadouts.append(entry as DotLoadout)
+		loadouts.append(entry as GSLoadout)
 
 	var target := index
 
@@ -468,14 +468,14 @@ func publish(
 		loadouts.append(loadout.duplicate_loadout())
 		target = loadouts.size() - 1
 	else:
-		var kept_name := (loadouts[target] as DotLoadout).display_name
+		var kept_name := (loadouts[target] as GSLoadout).display_name
 		loadouts[target] = loadout.duplicate_loadout()
 		if loadout.display_name == "":
-			(loadouts[target] as DotLoadout).display_name = kept_name
+			(loadouts[target] as GSLoadout).display_name = kept_name
 
 	# Flagged before the write: the flag is what a restart reads the selection from.
 	_flag_selected(loadouts, target, user_key)
-	var stored: DotResult = await store.store(user_key, loadouts)
+	var stored: GSResult = await store.store(user_key, loadouts)
 
 	if not stored.ok:
 		_flag_selected(existing, selected_index(user_key), user_key)
@@ -489,24 +489,24 @@ func publish(
 	_synthesised.erase(user_key)
 	loadouts_changed.emit(user_key)
 
-	return DotResult.success(target)
+	return GSResult.success(target)
 
 
 ## Why one more loadout is refused at [param held] held, or "" when it is not.
 func _cap_reason(held: int) -> String:
-	if held >= DotLoadout.MAX_SAVED:
-		return "a player may keep at most %d loadouts" % DotLoadout.MAX_SAVED
+	if held >= GSLoadout.MAX_SAVED:
+		return "a player may keep at most %d loadouts" % GSLoadout.MAX_SAVED
 	if config.max_per_player > 0 and held >= config.max_per_player:
 		return "a player may keep %d loadouts (the server's %s setting)" % [
-			config.max_per_player, DotLoadoutRules.CVAR_MAX_SAVED]
+			config.max_per_player, GSLoadoutRules.CVAR_MAX_SAVED]
 	return ""
 
 
 func _flag_selected(loadouts: Array, index: int, user_key: String = "") -> void:
 	var random_on := bool(_random_spawn.get(user_key, false))
 	for i in loadouts.size():
-		(loadouts[i] as DotLoadout).selected = i == index
-		(loadouts[i] as DotLoadout).random_spawn = random_on
+		(loadouts[i] as GSLoadout).selected = i == index
+		(loadouts[i] as GSLoadout).random_spawn = random_on
 
 
 ## Whether [param user_key] chose a fresh random loadout at every spawn. Needs them loaded.
@@ -515,92 +515,92 @@ func random_spawn_for(user_key: String) -> bool:
 
 
 ## Saves the player's "random loadout at every spawn" choice with their loadouts, so it survives a
-## restart. The server's rule ([constant DotLoadoutRandom.CVAR_SPAWN]) decides whether it is used.
-func set_random_spawn(user_key: String, on: bool) -> DotResult:
-	var loaded: DotResult = await load_for(user_key)
+## restart. The server's rule ([constant GSLoadoutRandom.CVAR_SPAWN]) decides whether it is used.
+func set_random_spawn(user_key: String, on: bool) -> GSResult:
+	var loaded: GSResult = await load_for(user_key)
 	if not loaded.ok:
 		return loaded
 	var held: Array = _cache.get(user_key, [])
 	if held.is_empty():
 		_random_spawn[user_key] = on
-		return DotResult.success(on)
+		return GSResult.success(on)
 	var before := random_spawn_for(user_key)
 	_random_spawn[user_key] = on
 	_flag_selected(held, selected_index(user_key), user_key)
-	var stored: DotResult = await store.store(user_key, _typed(held))
+	var stored: GSResult = await store.store(user_key, _typed(held))
 	if not stored.ok:
 		_random_spawn[user_key] = before
 		_flag_selected(held, selected_index(user_key), user_key)
 		return stored.wrap("Could not save the random-at-spawn choice.")
 	_synthesised.erase(user_key)
 	loadouts_changed.emit(user_key)
-	return DotResult.success(on)
+	return GSResult.success(on)
 
 
-func _typed(loadouts: Array) -> Array[DotLoadout]:
-	var out: Array[DotLoadout] = []
+func _typed(loadouts: Array) -> Array[GSLoadout]:
+	var out: Array[GSLoadout] = []
 	for l in loadouts:
-		out.append(l as DotLoadout)
+		out.append(l as GSLoadout)
 	return out
 
 
 ## Publishes over the loadout the player has selected (a new one only when they have none), so
 ## choosing items again edits the loadout in use rather than adding another.
-func publish_selected(user_key: String, loadout: DotLoadout) -> DotResult:
-	var _loaded: DotResult = await load_for(user_key)
+func publish_selected(user_key: String, loadout: GSLoadout) -> GSResult:
+	var _loaded: GSResult = await load_for(user_key)
 	var held: Array = _cache.get(user_key, [])
 	var at := selected_index(user_key) if not held.is_empty() else -1
 	return await publish(user_key, loadout, at)
 
 
 ## Saves [param loadout] under [param display_name] as a new loadout and selects it.
-func save_as(user_key: String, loadout: DotLoadout, display_name: String) -> DotResult:
-	var named := DotLoadoutNames.clean(display_name)
+func save_as(user_key: String, loadout: GSLoadout, display_name: String) -> GSResult:
+	var named := GSLoadoutNames.clean(display_name)
 	if not named.ok:
 		return _refuse(user_key, str(named.error.message))
 	var copy := loadout.duplicate_loadout()
 	copy.display_name = named.value
-	var _loaded: DotResult = await load_for(user_key)
+	var _loaded: GSResult = await load_for(user_key)
 	return await publish(user_key, copy, -1)
 
 
 ## Renames saved loadout [param index].
-func rename(user_key: String, index: int, display_name: String) -> DotResult:
-	var named := DotLoadoutNames.clean(display_name)
+func rename(user_key: String, index: int, display_name: String) -> GSResult:
+	var named := GSLoadoutNames.clean(display_name)
 	var held: Array = _cache.get(user_key, [])
 	if not named.ok or index < 0 or index >= held.size() or bool(_synthesised.get(user_key, false)):
 		return _refuse(user_key, str(named.error.message) if not named.ok else "no such loadout")
-	var next: Array[DotLoadout] = _typed(held)
+	var next: Array[GSLoadout] = _typed(held)
 	next[index] = next[index].duplicate_loadout()
 	next[index].display_name = named.value
 	return await _write(user_key, next, index)
 
 
 ## Deletes saved loadout [param index]; the last one cannot go (a player always spawns with one).
-func remove(user_key: String, index: int) -> DotResult:
+func remove(user_key: String, index: int) -> GSResult:
 	var held: Array = _cache.get(user_key, [])
 	if index < 0 or index >= held.size() or bool(_synthesised.get(user_key, false)):
 		return _refuse(user_key, "no such loadout")
 	if held.size() <= 1:
 		return _refuse(user_key, "keep at least one loadout")
-	var next: Array[DotLoadout] = _typed(held)
+	var next: Array[GSLoadout] = _typed(held)
 	next.remove_at(index)
 	var now := selected_index(user_key)
 	now = now - 1 if index < now else (0 if index == now else now)
 	return await _write(user_key, next, clampi(now, 0, next.size() - 1))
 
 
-func _write(user_key: String, next: Array[DotLoadout], selected: int) -> DotResult:
+func _write(user_key: String, next: Array[GSLoadout], selected: int) -> GSResult:
 	if not _publish_limiter.allow(user_key):
 		return _refuse(user_key, "publishing too fast")
 	_flag_selected(next, selected, user_key)
-	var stored: DotResult = await store.store(user_key, next)
+	var stored: GSResult = await store.store(user_key, next)
 	if not stored.ok:
 		return stored.wrap("Could not save the loadout.")
 	_cache[user_key] = next
 	_selected[user_key] = selected
 	loadouts_changed.emit(user_key)
-	return DotResult.success(selected)
+	return GSResult.success(selected)
 
 
 ## Name and whether it is the chosen one, per saved loadout, for a switcher.
@@ -609,7 +609,7 @@ func saved_list(user_key: String) -> Array[Dictionary]:
 	var held: Array = _cache.get(user_key, [])
 	var chosen := selected_index(user_key)
 	for i in held.size():
-		var name_text := (held[i] as DotLoadout).display_name
+		var name_text := (held[i] as GSLoadout).display_name
 		out.append({"index": i, "name": name_text if name_text != "" else "Loadout %d" % (i + 1),
 			"selected": i == chosen, "saved": not bool(_synthesised.get(user_key, false))})
 	return out
@@ -617,10 +617,10 @@ func saved_list(user_key: String) -> Array[Dictionary]:
 
 ## DEBUG, as GameSpice Inventory does: on an authoritative server a refusal is the rules being
 ## enforced, and WARN would fill the log with the sound of the system working.
-func _refuse(user_key: String, reason: String) -> DotResult:
-	DotLog.debug(CHANNEL, "loadout refused", {"key": user_key, "reason": reason})
+func _refuse(user_key: String, reason: String) -> GSResult:
+	GSLog.debug(CHANNEL, "loadout refused", {"key": user_key, "reason": reason})
 	loadout_refused.emit(user_key, reason)
-	return DotResult.fail(DotError.CODE_FORBIDDEN, reason)
+	return GSResult.fail(GSError.CODE_FORBIDDEN, reason)
 
 
 # --- Applying --------------------------------------------------------------
@@ -629,9 +629,9 @@ func _refuse(user_key: String, reason: String) -> DotResult:
 ##
 ## Deliberately not "give these to an arsenal": GameSpice Loadout does not import GameSpice Weapon,
 ## and a game that maps items to weapons does so with its own table. The `arsenal_slot`
-## on each [DotLoadoutSlot] is the hint that makes that table small, and GameSpice Weapon
-## ships a `DotWeaponLoadoutBridge` that consumes exactly what this returns.
-func resolve(loadout: DotLoadout) -> Array[Dictionary]:
+## on each [GSLoadoutSlot] is the hint that makes that table small, and GameSpice Weapon
+## ships a `GSWeaponLoadoutBridge` that consumes exactly what this returns.
+func resolve(loadout: GSLoadout) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 
 	if loadout == null or schema == null or schema.catalogue == null:

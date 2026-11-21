@@ -1,4 +1,4 @@
-class_name DotLoadoutInstantSwap
+class_name GSLoadoutInstantSwap
 extends RefCounted
 
 ## The rule for handing a menu choice over at once instead of at the next spawn: shortly after
@@ -43,7 +43,7 @@ func decide(key: String, now: float, since_spawn: float, since_fire: float, enem
 		why = "You fired a moment ago."
 	elif _last_swap.has(key) and now - float(_last_swap[key]) < cooldown:
 		why = "Instant change on cooldown (%ds)." % int(ceil(cooldown - (now - float(_last_swap[key]))))
-	DotLog.debug(CHANNEL, "instant swap decision", {"key": key, "why": why, "since_spawn": since_spawn,
+	GSLog.debug(CHANNEL, "instant swap decision", {"key": key, "why": why, "since_spawn": since_spawn,
 		"since_fire": since_fire, "enemy": enemy_dist})
 	return why
 

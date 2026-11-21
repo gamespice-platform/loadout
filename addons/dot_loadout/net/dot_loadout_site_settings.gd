@@ -1,4 +1,4 @@
-class_name DotLoadoutSiteSettings
+class_name GSLoadoutSiteSettings
 extends RefCounted
 
 ## The app's public settings as TMC serves them (`GET settings`, any credential): `{appId, sections:
@@ -13,7 +13,7 @@ signal failed(reason: String)
 const CHANNEL := "loadout.site"
 const PATH := "settings"
 
-## Any object with `get_integration(String, Dictionary) -> DotResult`.
+## Any object with `get_integration(String, Dictionary) -> GSResult`.
 var client: Object = null
 
 ## Seconds between reads in [method follow]; 0 reads once and stops.
@@ -29,31 +29,31 @@ var _generation: int = 0
 var _following := false
 
 
-static func with_client(p_client: Object, p_poll_sec: float = 60.0) -> DotLoadoutSiteSettings:
-	var s := DotLoadoutSiteSettings.new()
+static func with_client(p_client: Object, p_poll_sec: float = 60.0) -> GSLoadoutSiteSettings:
+	var s := GSLoadoutSiteSettings.new()
 	s.client = p_client
 	s.poll_sec = p_poll_sec
 	return s
 
 
-## A reader polling every [member DotLoadoutConfig.site_settings_poll_sec].
-static func from_config(config: DotLoadoutConfig, p_client: Object) -> DotLoadoutSiteSettings:
+## A reader polling every [member GSLoadoutConfig.site_settings_poll_sec].
+static func from_config(config: GSLoadoutConfig, p_client: Object) -> GSLoadoutSiteSettings:
 	return with_client(p_client, config.site_settings_poll_sec)
 
 
 ## Reads the settings now. The value is the names of the sections that changed.
-func refresh() -> DotResult:
+func refresh() -> GSResult:
 	if client == null or not client.has_method("get_integration"):
-		return DotResult.fail(DotError.CODE_STATE, "No backbone client with get_integration.")
-	var res: DotResult = await client.call("get_integration", PATH, {})
+		return GSResult.fail(GSError.CODE_STATE, "No backbone client with get_integration.")
+	var res: GSResult = await client.call("get_integration", PATH, {})
 	if not res.ok:
-		DotLog.warn(CHANNEL, "app settings read failed", {"error": str(res.error)})
+		GSLog.warn(CHANNEL, "app settings read failed", {"error": str(res.error)})
 		failed.emit(res.error.message)
 		return res
 	var sections: Variant = (res.value as Dictionary).get("sections") if res.value is Dictionary else null
 	if not sections is Dictionary:
-		var bad := DotResult.fail(DotError.CODE_PARSE, "The settings response has no sections object.")
-		DotLog.error(CHANNEL, "app settings malformed; keeping the last good ones", {"error": str(bad.error)})
+		var bad := GSResult.fail(GSError.CODE_PARSE, "The settings response has no sections object.")
+		GSLog.error(CHANNEL, "app settings malformed; keeping the last good ones", {"error": str(bad.error)})
 		failed.emit(bad.error.message)
 		return bad
 	app_id = str((res.value as Dictionary).get("appId", app_id))
@@ -61,7 +61,7 @@ func refresh() -> DotResult:
 	for name: Variant in (sections as Dictionary).keys():
 		var sec: Variant = sections[name]
 		if not sec is Dictionary or not (sec as Dictionary).get("values") is Dictionary:
-			DotLog.warn(CHANNEL, "app settings section malformed; skipped", {"section": str(name)})
+			GSLog.warn(CHANNEL, "app settings section malformed; skipped", {"section": str(name)})
 			continue
 		var ver := int((sec as Dictionary).get("version", 0))
 		var old: Dictionary = _sections.get(str(name), {})
@@ -71,7 +71,7 @@ func refresh() -> DotResult:
 		_sections[str(name)] = {"version": ver, "values": values}
 		changed.append(str(name))
 		section_changed.emit(str(name), values, ver)
-	return DotResult.success(changed)
+	return GSResult.success(changed)
 
 
 ## Reads now, then every [member poll_sec] until [method stop]. Needs a [SceneTree] for the timer.

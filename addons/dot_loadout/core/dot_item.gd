@@ -1,10 +1,10 @@
 @tool
-class_name DotItem
+class_name GSItem
 extends Resource
 
 ## One thing a player can be given, carry or wear into a match.
 ##
-## [b]Deliberately not a weapon.[/b] A weapon is a `DotWeaponDef` in GameSpice Weapon, which
+## [b]Deliberately not a weapon.[/b] A weapon is a `GSWeaponDef` in GameSpice Weapon, which
 ## GameSpice Loadout does not import — an item names one by id and something else resolves
 ## it. That is what makes a loadout a document a server can validate without loading a
 ## mesh, a scene or a weapon resource, which is the same trade GameSpice User Avatar makes
@@ -13,7 +13,7 @@ extends Resource
 
 ## What this is, so a slot can say what it accepts.
 ##
-## Not exhaustive, and not an enum for the reason [DotHitGroup] is not one: a game
+## Not exhaustive, and not an enum for the reason [GSHitGroup] is not one: a game
 ## with a deployable, a vehicle key or a spell has a kind GameSpice Loadout has never heard
 ## of, and an enum would make adding one a fork.
 const KIND_WEAPON := &"weapon"
@@ -42,20 +42,20 @@ const KIND_PERK := &"perk"
 
 @export_group("Cost")
 
-## Points this costs against [member DotLoadoutSchema.point_budget].
+## Points this costs against [member GSLoadoutSchema.point_budget].
 ##
 ## The mechanism behind "you may take one heavy weapon, or three light ones" without
 ## the schema having to enumerate every legal combination.
 @export_range(0, 1000, 1) var cost: int = 0
 
-## Counts against [member DotLoadoutSchema.weight_budget]. Distinct from cost so a
+## Counts against [member GSLoadoutSchema.weight_budget]. Distinct from cost so a
 ## game can have both a balance budget and a carry limit.
 @export_range(0.0, 1000.0, 0.1) var weight: float = 0.0
 
 @export_group("Entitlement")
 
 ## Everyone has this. The default is [b]false[/b], deliberately — see
-## [DotLoadoutEntitlements].
+## [GSLoadoutEntitlements].
 @export var free: bool = false
 
 ## Entitlement checked instead of [member id], when several items share one unlock.
@@ -89,8 +89,8 @@ static func make(
 	p_id: StringName,
 	p_kind: StringName = KIND_WEAPON,
 	p_free: bool = false
-) -> DotItem:
-	var item := DotItem.new()
+) -> GSItem:
+	var item := GSItem.new()
 	item.id = p_id
 	item.display_name = String(p_id).capitalize()
 	item.kind = p_kind
@@ -115,24 +115,24 @@ func fits_slot(slot_id: StringName) -> bool:
 	return slots.is_empty() or slots.has(slot_id)
 
 
-func validate() -> DotResult:
+func validate() -> GSResult:
 	if id == &"":
-		return DotResult.fail(DotError.CODE_INVALID, "An item needs an id.")
+		return GSResult.fail(GSError.CODE_INVALID, "An item needs an id.")
 
 	if fallback_id == id:
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"Item '%s' falls back to itself, which cannot terminate." % id
 		)
 
 	if max_count > 0 and max_count < count:
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"Item '%s' has a default count of %d above its maximum of %d."
 				% [id, count, max_count]
 		)
 
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
 func describe() -> Dictionary:
@@ -150,4 +150,4 @@ func describe() -> Dictionary:
 
 
 func _to_string() -> String:
-	return "DotItem(%s)" % id
+	return "GSItem(%s)" % id

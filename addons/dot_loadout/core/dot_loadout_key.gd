@@ -1,4 +1,4 @@
-class_name DotLoadoutKey
+class_name GSLoadoutKey
 extends RefCounted
 
 ## What a loadout may be keyed by, and how that string is checked.

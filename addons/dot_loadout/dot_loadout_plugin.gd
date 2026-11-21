@@ -4,24 +4,24 @@ extends EditorPlugin
 ## Editor entry point for GameSpice Loadout. Registers inspector types only.
 ##
 ## No autoload, for the family's reason: a process may run a server and a client at
-## once, and a singleton loadout manager makes that impossible. [DotLoadoutManager]
-## registers itself in [DotRegistry] instead.
+## once, and a singleton loadout manager makes that impossible. [GSLoadoutManager]
+## registers itself in [GSRegistry] instead.
 
 const _ICON := "res://addons/dot_loadout/icon_placeholder.svg"
 
 const _TYPES := [
 	[
-		"DotLoadoutManager",
+		"GSLoadoutManager",
 		"Node",
 		"res://addons/dot_loadout/dot_loadout_manager.gd",
 	],
 	[
-		"DotPickup",
+		"GSPickup",
 		"Node3D",
 		"res://addons/dot_loadout/world/dot_pickup.gd",
 	],
 	[
-		"DotPickupField",
+		"GSPickupField",
 		"Node",
 		"res://addons/dot_loadout/world/dot_pickup_field.gd",
 	],

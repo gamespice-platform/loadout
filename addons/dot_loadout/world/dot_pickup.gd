@@ -1,5 +1,5 @@
 @tool
-class_name DotPickup
+class_name GSPickup
 extends Node3D
 
 ## Something on the floor that a player can walk over and take.
@@ -111,13 +111,13 @@ func in_range(position: Vector3) -> bool:
 ## [param wanted] is whether the taker actually has room — a caller passes false for a
 ## health pack at full health. With [member allow_wasteful_pickup] off that is a
 ## refusal, which leaves the pack on the floor for someone who needs it.
-func take(taker: int, tick: int, wanted: bool = true) -> DotResult:
+func take(taker: int, tick: int, wanted: bool = true) -> GSResult:
 	if not available:
-		return DotResult.fail(DotError.CODE_STATE, "This pickup is not available.")
+		return GSResult.fail(GSError.CODE_STATE, "This pickup is not available.")
 
 	if not wanted and not allow_wasteful_pickup:
-		return DotResult.fail(
-			DotError.CODE_STATE, "The taker has no room for this."
+		return GSResult.fail(
+			GSError.CODE_STATE, "The taker has no room for this."
 		)
 
 	available = false
@@ -125,7 +125,7 @@ func take(taker: int, tick: int, wanted: bool = true) -> DotResult:
 	respawn_tick = tick + respawn_ticks() if respawn_sec > 0.0 else -1
 
 	taken.emit(taker, tick)
-	return DotResult.success(true)
+	return GSResult.success(true)
 
 
 ## Advances the respawn timer.
@@ -175,7 +175,7 @@ func describe() -> Dictionary:
 
 
 func _to_string() -> String:
-	return "DotPickup(%s, %s)" % [
+	return "GSPickup(%s, %s)" % [
 		ammo_pool if is_ammo() else item_id,
 		"available" if available else "taken",
 	]

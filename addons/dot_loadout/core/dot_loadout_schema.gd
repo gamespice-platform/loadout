@@ -1,5 +1,5 @@
 @tool
-class_name DotLoadoutSchema
+class_name GSLoadoutSchema
 extends Resource
 
 ## The shape a loadout must have: which slots exist, what goes in them, and what a
@@ -16,20 +16,20 @@ const CHANNEL := "loadout.schema"
 @export var display_name: String = ""
 
 ## Bumped when the slots change in a way that invalidates saved loadouts. Carried by
-## every [DotLoadout] so a mismatch is visible rather than mysterious.
+## every [GSLoadout] so a mismatch is visible rather than mysterious.
 @export_range(1, 100000, 1) var version: int = 1
 
-@export var slots: Array[DotLoadoutSlot] = []
+@export var slots: Array[GSLoadoutSlot] = []
 
 ## Where item ids are looked up.
-@export var catalogue: DotItemCatalogue = null
+@export var catalogue: GSItemCatalogue = null
 
 @export_group("Budgets")
 
-## Total [member DotItem.cost] a loadout may spend. Zero means unlimited.
+## Total [member GSItem.cost] a loadout may spend. Zero means unlimited.
 @export_range(0, 10000, 1) var point_budget: int = 0
 
-## Total [member DotItem.weight] a loadout may carry. Zero means unlimited.
+## Total [member GSItem.weight] a loadout may carry. Zero means unlimited.
 @export_range(0.0, 10000.0, 0.5) var weight_budget: float = 0.0
 
 @export_group("Policy")
@@ -43,10 +43,10 @@ var _indexed: bool = false
 
 static func of(
 	p_id: StringName,
-	p_slots: Array[DotLoadoutSlot],
-	p_catalogue: DotItemCatalogue
-) -> DotLoadoutSchema:
-	var schema := DotLoadoutSchema.new()
+	p_slots: Array[GSLoadoutSlot],
+	p_catalogue: GSItemCatalogue
+) -> GSLoadoutSchema:
+	var schema := GSLoadoutSchema.new()
 	schema.id = p_id
 	schema.slots = p_slots
 	schema.catalogue = p_catalogue
@@ -68,7 +68,7 @@ func _ensure_indexed() -> void:
 		reindex()
 
 
-func slot(slot_id: StringName) -> DotLoadoutSlot:
+func slot(slot_id: StringName) -> GSLoadoutSlot:
 	_ensure_indexed()
 	return _by_id.get(slot_id)
 
@@ -87,11 +87,11 @@ func slot_ids() -> Array[StringName]:
 
 ## Slots in presentation order, then declaration order.
 ##
-## A stable sort: two slots with the same [member DotLoadoutSlot.order] keep the order
+## A stable sort: two slots with the same [member GSLoadoutSlot.order] keep the order
 ## they were declared in. Godot's `sort_custom` is not stable, so the comparator falls
 ## back to the declared index rather than leaving it to the algorithm — otherwise a
 ## loadout screen's slot order changes between runs.
-func ordered_slots() -> Array[DotLoadoutSlot]:
+func ordered_slots() -> Array[GSLoadoutSlot]:
 	var indexed: Array[Vector2i] = []
 
 	for index in range(slots.size()):
@@ -104,7 +104,7 @@ func ordered_slots() -> Array[DotLoadoutSlot]:
 		return a.y < b.y
 	)
 
-	var out: Array[DotLoadoutSlot] = []
+	var out: Array[GSLoadoutSlot] = []
 
 	for entry in indexed:
 		out.append(slots[entry.y])
@@ -112,8 +112,8 @@ func ordered_slots() -> Array[DotLoadoutSlot]:
 	return out
 
 
-func required_slots() -> Array[DotLoadoutSlot]:
-	var out: Array[DotLoadoutSlot] = []
+func required_slots() -> Array[GSLoadoutSlot]:
+	var out: Array[GSLoadoutSlot] = []
 	for slot in ordered_slots():
 		if slot.required:
 			out.append(slot)
@@ -127,14 +127,14 @@ func required_slots() -> Array[DotLoadoutSlot]:
 ## is different from everything the slot accepts. A screen that shows the second and
 ## refuses on submit is a screen that lies.
 ##
-## [param rules] are a server owner's ([DotLoadoutRules]): null is no restriction. Untyped so the
+## [param rules] are a server owner's ([GSLoadoutRules]): null is no restriction. Untyped so the
 ## parameter can be left out by a caller written before the rules existed.
 func choices_for(
 	slot_id: StringName,
-	entitlements: DotLoadoutEntitlements,
+	entitlements: GSLoadoutEntitlements,
 	rules: Variant = null
-) -> Array[DotItem]:
-	var out: Array[DotItem] = []
+) -> Array[GSItem]:
+	var out: Array[GSItem] = []
 	var target := slot(slot_id)
 
 	if target == null or catalogue == null:
@@ -150,7 +150,7 @@ func choices_for(
 		if entitlements != null and not entitlements.allows(item):
 			continue
 
-		if rules is DotLoadoutRules and not (rules as DotLoadoutRules).permits(slot_id, item):
+		if rules is GSLoadoutRules and not (rules as GSLoadoutRules).permits(slot_id, item):
 			continue
 
 		out.append(item)
@@ -161,8 +161,8 @@ func choices_for(
 ## A loadout with every required slot filled from its default and nothing else.
 ##
 ## What a player with no saved loadout gets, and what conforming falls back to.
-func default_loadout() -> DotLoadout:
-	var loadout := DotLoadout.empty(id)
+func default_loadout() -> GSLoadout:
+	var loadout := GSLoadout.empty(id)
 	loadout.catalogue_version = catalogue.version if catalogue != null else 0
 
 	for slot in ordered_slots():
@@ -172,16 +172,16 @@ func default_loadout() -> DotLoadout:
 	return loadout
 
 
-## The point budget in force: the server's [member DotLoadoutRules.point_budget] when it set one,
+## The point budget in force: the server's [member GSLoadoutRules.point_budget] when it set one,
 ## else this schema's. 0 is unlimited.
-func effective_budget(rules: DotLoadoutRules = null) -> int:
+func effective_budget(rules: GSLoadoutRules = null) -> int:
 	if rules != null and rules.point_budget > 0:
 		return rules.point_budget
 	return point_budget
 
 
 ## Points a loadout spends.
-func points_used(loadout: DotLoadout) -> int:
+func points_used(loadout: GSLoadout) -> int:
 	var total := 0
 
 	if catalogue == null:
@@ -195,7 +195,7 @@ func points_used(loadout: DotLoadout) -> int:
 	return total
 
 
-func weight_used(loadout: DotLoadout) -> float:
+func weight_used(loadout: GSLoadout) -> float:
 	var total := 0.0
 
 	if catalogue == null:
@@ -209,17 +209,17 @@ func weight_used(loadout: DotLoadout) -> float:
 	return total
 
 
-func validate() -> DotResult:
+func validate() -> GSResult:
 	reindex()
 
 	if slots.is_empty():
-		return DotResult.fail(
-			DotError.CODE_INVALID, "Schema '%s' declares no slots." % id
+		return GSResult.fail(
+			GSError.CODE_INVALID, "Schema '%s' declares no slots." % id
 		)
 
 	if catalogue == null:
-		return DotResult.fail(
-			DotError.CODE_INVALID, "Schema '%s' has no catalogue." % id
+		return GSResult.fail(
+			GSError.CODE_INVALID, "Schema '%s' has no catalogue." % id
 		)
 
 	var catalogue_res := catalogue.validate()
@@ -231,8 +231,8 @@ func validate() -> DotResult:
 
 	for slot in slots:
 		if slot == null:
-			return DotResult.fail(
-				DotError.CODE_INVALID, "Schema '%s' holds a null slot." % id
+			return GSResult.fail(
+				GSError.CODE_INVALID, "Schema '%s' holds a null slot." % id
 			)
 
 		var res := slot.validate()
@@ -241,8 +241,8 @@ func validate() -> DotResult:
 			return res
 
 		if seen.has(slot.id):
-			return DotResult.fail(
-				DotError.CODE_INVALID,
+			return GSResult.fail(
+				GSError.CODE_INVALID,
 				"Schema '%s' declares slot '%s' twice." % [id, slot.id]
 			)
 
@@ -254,8 +254,8 @@ func validate() -> DotResult:
 		var item := catalogue.find(slot.default_item)
 
 		if item == null:
-			return DotResult.fail(
-				DotError.CODE_INVALID,
+			return GSResult.fail(
+				GSError.CODE_INVALID,
 				"Slot '%s' defaults to '%s', which is not in the catalogue."
 					% [slot.id, slot.default_item]
 			)
@@ -264,8 +264,8 @@ func validate() -> DotResult:
 		# loadout, which then repairs again. The loop terminates but the result is a
 		# player who cannot spawn, and the cause is three files away.
 		if not slot.accepts(item):
-			return DotResult.fail(
-				DotError.CODE_INVALID,
+			return GSResult.fail(
+				GSError.CODE_INVALID,
 				"Slot '%s' defaults to '%s', which it does not accept: %s"
 					% [slot.id, slot.default_item, slot.rejection(item)]
 			)
@@ -273,7 +273,7 @@ func validate() -> DotResult:
 		if not item.free:
 			# A required default nobody owns means every player without that
 			# entitlement is repaired into an invalid loadout.
-			DotLog.warn(
+			GSLog.warn(
 				CHANNEL,
 				"a slot default is not free, so players without it cannot be repaired",
 				{"slot": String(slot.id), "item": String(item.id)}
@@ -282,13 +282,13 @@ func validate() -> DotResult:
 	var baseline := default_loadout()
 
 	if point_budget > 0 and points_used(baseline) > point_budget:
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"Schema '%s' has a default loadout costing %d against a budget of %d."
 				% [id, points_used(baseline), point_budget]
 		)
 
-	return DotResult.success(slots.size())
+	return GSResult.success(slots.size())
 
 
 func describe() -> Dictionary:
@@ -307,4 +307,4 @@ func describe() -> Dictionary:
 
 
 func _to_string() -> String:
-	return "DotLoadoutSchema(%s, %d slots)" % [id, slots.size()]
+	return "GSLoadoutSchema(%s, %d slots)" % [id, slots.size()]

@@ -8,17 +8,17 @@ extends "loadout_demo_wire_manager.gd"
 func _test_pickups() -> void:
 	_section("pickups")
 
-	var field := DotPickupField.new()
+	var field := GSPickupField.new()
 	field.tick_rate = 60
 	add_child(field)
 
-	var health := DotPickup.new()
+	var health := GSPickup.new()
 	health.item_id = &"medkit"
 	health.respawn_sec = 1.0
 	health.position = Vector3(0.0, 0.0, 0.0)
 	field.add_child(health)
 
-	var ammo := DotPickup.new()
+	var ammo := GSPickup.new()
 	ammo.ammo_pool = &"rifle"
 	ammo.ammo_amount = 30
 	ammo.respawn_sec = 0.0
@@ -38,7 +38,7 @@ func _test_pickups() -> void:
 
 	var taken: Array[int] = []
 	field.collected.connect(
-		func(_p: DotPickup, taker: int, _t: int) -> void: taken.append(taker)
+		func(_p: GSPickup, taker: int, _t: int) -> void: taken.append(taker)
 	)
 
 	var got := field.sweep(7, Vector3.ZERO, 100)
@@ -62,7 +62,7 @@ func _test_pickups() -> void:
 	_check(health.available, "ticking the same tick twice is idempotent")
 
 	# A pickup nobody has room for stays on the floor.
-	field.wants_fn = func(_taker: int, _pickup: DotPickup) -> bool: return false
+	field.wants_fn = func(_taker: int, _pickup: GSPickup) -> bool: return false
 	var refused := field.sweep(10, Vector3.ZERO, 300)
 	_check(refused.is_empty(), "a pickup nobody needs is not taken")
 	_check(health.available, "and is left for someone who does")
@@ -79,7 +79,7 @@ func _test_pickups() -> void:
 	_done()
 
 
-func _check_pickups_client(field: DotPickupField, health: DotPickup, ammo: DotPickup) -> void:
+func _check_pickups_client(field: GSPickupField, health: GSPickup, ammo: GSPickup) -> void:
 	# A client instance reports what is nearby and takes nothing.
 	field.reset(400)
 	field.is_authority = false
@@ -94,9 +94,9 @@ func _check_pickups_client(field: DotPickupField, health: DotPickup, ammo: DotPi
 
 
 
-func _check_freed_pickup(field: DotPickupField) -> void:
+func _check_freed_pickup(field: GSPickupField) -> void:
 	# Every accessor, with a pickup freed after the refresh, must not touch it.
-	var doomed := DotPickup.new()
+	var doomed := GSPickup.new()
 	doomed.item_id = &"doomed"
 	field.add_child(doomed)
 	field.refresh()
@@ -124,72 +124,72 @@ func _check_freed_pickup(field: DotPickupField) -> void:
 func _test_rules() -> void:
 	_section("server rules")
 
-	var starter: DotResult = DotLoadoutRules.parse(true, "primary=tag:starter secondary=pistol", "")
+	var starter: GSResult = GSLoadoutRules.parse(true, "primary=tag:starter secondary=pistol", "")
 	_check(starter.ok, "an allow list parses")
-	var rules: DotLoadoutRules = starter.value
+	var rules: GSLoadoutRules = starter.value
 	_check(rules.permits(&"primary", _catalogue.find(&"rifle")), "an item with the tag is permitted")
 	_check(not rules.permits(&"primary", _catalogue.find(&"sniper")), "one without it is not")
 	_check(rules.permits(&"utility", _catalogue.find(&"grenade")), "a slot the rules do not name is open")
 
-	var no_boom: DotLoadoutRules = DotLoadoutRules.parse(true, "*=-tag:explosive", "").value
+	var no_boom: GSLoadoutRules = GSLoadoutRules.parse(true, "*=-tag:explosive", "").value
 	_check(
 		no_boom.permits(&"primary", _catalogue.find(&"sniper"))
 			and not no_boom.permits(&"primary", _catalogue.find(&"rocket")),
 		"a forbid on every slot takes out only what it names"
 	)
 
-	_check(not DotLoadoutRules.parse(true, "primary", "").ok, "a word that is not slot=item is refused")
-	_check(not DotLoadoutRules.parse(true, "", "primary=rifle,sniper").ok, "a fixed slot takes one item")
-	_check(not DotLoadoutRules.parse(true, "", "*=rifle").ok, "and '*' cannot be fixed")
+	_check(not GSLoadoutRules.parse(true, "primary", "").ok, "a word that is not slot=item is refused")
+	_check(not GSLoadoutRules.parse(true, "", "primary=rifle,sniper").ok, "a fixed slot takes one item")
+	_check(not GSLoadoutRules.parse(true, "", "*=rifle").ok, "and '*' cannot be fixed")
 
 	var schema := _build_schema()
 	_check(
-		not DotLoadoutRules.parse(true, "barrel=rifle", "").value.check(schema).ok,
+		not GSLoadoutRules.parse(true, "barrel=rifle", "").value.check(schema).ok,
 		"a slot the schema does not have is refused by check()"
 	)
 	_check(
-		not DotLoadoutRules.parse(true, "", "primary=none").value.check(schema).ok,
+		not GSLoadoutRules.parse(true, "", "primary=none").value.check(schema).ok,
 		"a required slot cannot be fixed empty"
 	)
 	_check(
-		not DotLoadoutRules.parse(true, "primary=tag:nothing", "").value.check(schema).ok,
+		not GSLoadoutRules.parse(true, "primary=tag:nothing", "").value.check(schema).ok,
 		"rules that leave a required slot nothing are refused"
 	)
 	_check(
-		DotLoadoutRules.parse(true, "", "primary=sniper").value.check(schema).ok,
+		GSLoadoutRules.parse(true, "", "primary=sniper").value.check(schema).ok,
 		"fixing an item nobody has unlocked is the owner's call"
 	)
 
-	var only_sniper: DotLoadoutRules = DotLoadoutRules.parse(true, "primary=sniper", "").value
-	var everything := DotLoadoutEntitlements.everything()
-	var ids := schema.choices_for(&"primary", everything, only_sniper).map(func(i: DotItem) -> StringName: return i.id)
+	var only_sniper: GSLoadoutRules = GSLoadoutRules.parse(true, "primary=sniper", "").value
+	var everything := GSLoadoutEntitlements.everything()
+	var ids := schema.choices_for(&"primary", everything, only_sniper).map(func(i: GSItem) -> StringName: return i.id)
 	_check(ids == [&"sniper"], "choices_for honours the rules", str(ids))
 
-	var refused := DotLoadoutValidator.validate(_full_loadout(), schema, everything, only_sniper)
+	var refused := GSLoadoutValidator.validate(_full_loadout(), schema, everything, only_sniper)
 	_check(
-		not refused.ok and refused.error.code == DotError.CODE_FORBIDDEN,
+		not refused.ok and refused.error.code == GSError.CODE_FORBIDDEN,
 		"validate refuses an item the server does not allow"
 	)
 
 	var repaired := _full_loadout()
-	var _changes := DotLoadoutValidator.conform(repaired, schema, everything, only_sniper)
+	var _changes := GSLoadoutValidator.conform(repaired, schema, everything, only_sniper)
 	_check(repaired.item_in(&"primary") == &"sniper", "conform swaps a disallowed item for an allowed one")
 
-	var fixed_rules: DotLoadoutRules = DotLoadoutRules.parse(true, "", "primary=sniper utility=none").value
+	var fixed_rules: GSLoadoutRules = GSLoadoutRules.parse(true, "", "primary=sniper utility=none").value
 	var fixed := _full_loadout()
-	var _f := DotLoadoutValidator.conform(fixed, schema, DotLoadoutEntitlements.none(), fixed_rules)
+	var _f := GSLoadoutValidator.conform(fixed, schema, GSLoadoutEntitlements.none(), fixed_rules)
 	_check(
 		fixed.item_in(&"primary") == &"sniper" and not fixed.has_slot(&"utility"),
 		"conform writes the fixed slots, unlocked or not, and empties a 'none'"
 	)
 	_check(
-		DotLoadoutValidator.validate(fixed, schema, DotLoadoutEntitlements.none(), fixed_rules).ok,
+		GSLoadoutValidator.validate(fixed, schema, GSLoadoutEntitlements.none(), fixed_rules).ok,
 		"and the result validates"
 	)
 
-	var round: DotResult = DotLoadoutRules.from_dictionary(fixed_rules.to_dictionary())
+	var round: GSResult = GSLoadoutRules.from_dictionary(fixed_rules.to_dictionary())
 	_check(
-		round.ok and (round.value as DotLoadoutRules).fixed_text() == fixed_rules.fixed_text(),
+		round.ok and (round.value as GSLoadoutRules).fixed_text() == fixed_rules.fixed_text(),
 		"rules survive a dictionary round trip", fixed_rules.fixed_text()
 	)
 	_done()
@@ -202,31 +202,31 @@ func _test_manager_rules() -> void:
 	var key := "player-rules-0001"
 	var wanted := _full_loadout()
 	wanted.set_item(&"utility", &"medkit")
-	var published: DotResult = await manager.publish(key, wanted)
+	var published: GSResult = await manager.publish(key, wanted)
 	_check(published.ok, "a loadout publishes with no rules")
 
-	manager.set_rules(DotLoadoutRules.parse(true, "", "utility=grenade").value)
-	var active: DotResult = await manager.active_for(key)
-	_check((active.value as DotLoadout).item_in(&"utility") == &"grenade", "a fixed slot overrides the saved choice")
-	var saved: DotResult = await manager.load_for(key)
+	manager.set_rules(GSLoadoutRules.parse(true, "", "utility=grenade").value)
+	var active: GSResult = await manager.active_for(key)
+	_check((active.value as GSLoadout).item_in(&"utility") == &"grenade", "a fixed slot overrides the saved choice")
+	var saved: GSResult = await manager.load_for(key)
 	_check(
-		((saved.value as Array)[0] as DotLoadout).item_in(&"utility") == &"medkit",
+		((saved.value as Array)[0] as GSLoadout).item_in(&"utility") == &"medkit",
 		"without writing over what the player saved"
 	)
 
 	manager.set_rules(null)
-	var back: DotResult = await manager.active_for(key)
-	_check((back.value as DotLoadout).item_in(&"utility") == &"medkit", "lifting the rule gives the choice back")
+	var back: GSResult = await manager.active_for(key)
+	_check((back.value as GSLoadout).item_in(&"utility") == &"medkit", "lifting the rule gives the choice back")
 
-	manager.set_rules(DotLoadoutRules.parse(false, "", "").value)
+	manager.set_rules(GSLoadoutRules.parse(false, "", "").value)
 	_check(not manager.players_choose(), "with choosing off nobody chooses")
-	var locked: DotResult = await manager.publish(key, wanted)
+	var locked: GSResult = await manager.publish(key, wanted)
 	_check(not locked.ok, "and a publish is refused")
-	var defaults: DotResult = await manager.active_for(key)
-	_check(not (defaults.value as DotLoadout).has_slot(&"utility"), "everybody spawns with the defaults")
+	var defaults: GSResult = await manager.active_for(key)
+	_check(not (defaults.value as GSLoadout).has_slot(&"utility"), "everybody spawns with the defaults")
 
-	manager.set_rules(DotLoadoutRules.parse(true, "utility=grenade", "").value)
-	var offer: DotResult = await manager.offer_for(key)
+	manager.set_rules(GSLoadoutRules.parse(true, "utility=grenade", "").value)
+	var offer: GSResult = await manager.offer_for(key)
 	_check(offer.ok and (offer.value["slots"] as Array).size() == 5, "the offer lists every slot")
 	var primary: Dictionary = (offer.value["slots"] as Array)[0]
 	var primary_ids: Array = (primary["choices"] as Array).map(func(c: Variant) -> String: return str(c["id"]))
@@ -236,7 +236,7 @@ func _test_manager_rules() -> void:
 	)
 	_check(not (primary["choices"][0] as Dictionary).has("locked"), "the default offer carries no lock flags")
 	manager.store_url = "https://example.test/store"
-	var wide: DotResult = await manager.offer_for(key, true)
+	var wide: GSResult = await manager.offer_for(key, true)
 	var wide_primary: Array = (wide.value["slots"] as Array)[0]["choices"]
 	var sniper_row: Dictionary = {}
 	var rifle_row: Dictionary = {}
@@ -254,7 +254,7 @@ func _test_manager_rules() -> void:
 	manager.store_requested.connect(func(id: StringName, url: String) -> void: asked.append([id, url]))
 	manager.request_store(&"sniper")
 	_check(asked == [[&"sniper", "https://example.test/store"]], "request_store emits store_requested")
-	var still: DotResult = await manager.offer_for(key)
+	var still: GSResult = await manager.offer_for(key)
 	var still_ids: Array = ((still.value["slots"] as Array)[0]["choices"] as Array).map(func(c: Variant) -> String: return str(c["id"]))
 	_check(not still_ids.has("sniper"), "and the default offer still hides it")
 	var utility: Dictionary = (offer.value["slots"] as Array)[2]
@@ -264,8 +264,8 @@ func _test_manager_rules() -> void:
 	)
 	var medkit := _full_loadout()
 	medkit.set_item(&"utility", &"medkit")
-	var refused: DotResult = await manager.publish(key, medkit)
-	_check(not refused.ok and refused.error.code == DotError.CODE_FORBIDDEN, "publish refuses what the owner does not allow")
+	var refused: GSResult = await manager.publish(key, medkit)
+	_check(not refused.ok and refused.error.code == GSError.CODE_FORBIDDEN, "publish refuses what the owner does not allow")
 
 	manager.queue_free()
 	_done()
@@ -316,7 +316,7 @@ func _test_command() -> void:
 	_section("the loadout command")
 
 	var manager := _make_manager()
-	var cmd := DotLoadoutCommand.new()
+	var cmd := GSLoadoutCommand.new()
 	cmd.manager = manager
 	cmd.key_fn = func(_ctx: Object) -> String: return "player-cmd-0001"
 	var sent: Array = []
@@ -330,16 +330,16 @@ func _test_command() -> void:
 	cmd.bind(host)
 	_check(host.commands.has("loadout") and host.cvars.size() == 20, "bind registers the command, five rule cvars, two store-cap cvars, five instant-swap cvars and eight random cvars")
 
-	(host.cvars[DotLoadoutRules.CVAR_ALLOW] as FakeCvar).set_to("utility=grenade")
+	(host.cvars[GSLoadoutRules.CVAR_ALLOW] as FakeCvar).set_to("utility=grenade")
 	_check(manager.rules != null and manager.rules.allowed.has(&"utility"), "a cvar change puts the rules on the manager")
-	var vetted: DotResult = (host.cvars[DotLoadoutRules.CVAR_ALLOW] as FakeCvar).validator.call("barrel=rifle")
+	var vetted: GSResult = (host.cvars[GSLoadoutRules.CVAR_ALLOW] as FakeCvar).validator.call("barrel=rifle")
 	_check(not vetted.ok, "the cvar's validator refuses a value the rules cannot take, before it is set")
-	(host.cvars[DotLoadoutRules.CVAR_ALLOW] as FakeCvar).set_to("barrel=rifle")
+	(host.cvars[GSLoadoutRules.CVAR_ALLOW] as FakeCvar).set_to("barrel=rifle")
 	_check(
 		manager.rules != null and manager.rules.allowed.has(&"utility") and cmd.last_refusal != "",
 		"a bad value keeps the old rules and says why", cmd.last_refusal
 	)
-	(host.cvars[DotLoadoutRules.CVAR_ALLOW] as FakeCvar).set_to("")
+	(host.cvars[GSLoadoutRules.CVAR_ALLOW] as FakeCvar).set_to("")
 	_check(manager.rules == null, "an empty value is no restriction")
 
 	var ctx := FakeCtx.new()
@@ -351,8 +351,8 @@ func _test_command() -> void:
 	await handler.call(ctx)
 	var result: Dictionary = (sent[-1] as Dictionary).get("result", {})
 	_check(bool(result.get("ok", false)) and not bool(result.get("now", true)), "a choice saves for the next spawn", str(result))
-	var active: DotResult = await manager.active_for("player-cmd-0001")
-	_check((active.value as DotLoadout).item_in(&"utility") == &"medkit", "and is the player's loadout")
+	var active: GSResult = await manager.active_for("player-cmd-0001")
+	_check((active.value as GSLoadout).item_in(&"utility") == &"medkit", "and is the player's loadout")
 
 	equipped_now[0] = true
 	ctx.args = PackedStringArray(["primary=rifle"])
@@ -370,13 +370,13 @@ func _test_command() -> void:
 		and not bool(closed_choice["ok"]), "a game can close the menu for its own reason, and says it")
 	cmd.closed_fn = Callable()
 
-	(host.cvars[DotLoadoutRules.CVAR_MENU] as FakeCvar).set_to("0")
+	(host.cvars[GSLoadoutRules.CVAR_MENU] as FakeCvar).set_to("0")
 	ctx.args = PackedStringArray(["utility=grenade"])
 	await handler.call(ctx)
 	_check(not bool((sent[-1] as Dictionary)["result"].get("ok", true)), "with the menu off a choice is refused")
 
-	_check(not DotLoadoutCommand.parse_choice("primary=rifle oops").ok, "a word that is not slot=item is an answer")
-	var picks: Dictionary = DotLoadoutCommand.parse_choice(DotLoadoutCommand.choice_text({"secondary": "pistol", "primary": "rifle"})).value
+	_check(not GSLoadoutCommand.parse_choice("primary=rifle oops").ok, "a word that is not slot=item is an answer")
+	var picks: Dictionary = GSLoadoutCommand.parse_choice(GSLoadoutCommand.choice_text({"secondary": "pistol", "primary": "rifle"})).value
 	_check(picks.get("primary") == "rifle" and picks.get("secondary") == "pistol", "choice_text and parse_choice agree")
 
 	manager.queue_free()
@@ -385,7 +385,7 @@ func _test_command() -> void:
 
 func _test_instant_swap() -> void:
 	_section("instant swap after spawn")
-	var r := DotLoadoutInstantSwap.new()
+	var r := GSLoadoutInstantSwap.new()
 	_check(r.decide("k", 0.0, 1.0, -1.0, -1.0) != "", "off by default in the addon")
 	r.enabled = true
 	_check(r.decide("k", 0.0, 1.0, -1.0, -1.0) == "", "inside the window, nobody near, not firing: allowed")
@@ -400,13 +400,13 @@ func _test_instant_swap() -> void:
 	_check(r.decide("k", 111.0, 1.0, -1.0, -1.0) == "", "after the cooldown: allowed")
 
 	var manager := _make_manager()
-	var cmd := DotLoadoutCommand.new()
+	var cmd := GSLoadoutCommand.new()
 	cmd.manager = manager
 	var host := FakeHost.new()
 	cmd.bind(host)
 	_check(cmd.instant.enabled == false, "cvar default follows the field (off)")
-	(host.cvars[DotLoadoutInstantSwap.CVAR_ENABLE] as FakeCvar).set_to("1")
-	(host.cvars[DotLoadoutInstantSwap.CVAR_COOLDOWN] as FakeCvar).set_to("30")
+	(host.cvars[GSLoadoutInstantSwap.CVAR_ENABLE] as FakeCvar).set_to("1")
+	(host.cvars[GSLoadoutInstantSwap.CVAR_COOLDOWN] as FakeCvar).set_to("30")
 	_check(cmd.instant.enabled and cmd.instant.cooldown == 30.0, "cvars reach the rule")
 	var facts := {"now": 50.0, "since_spawn": 2.0, "since_fire": -1.0, "enemy_dist": -1.0}
 	var applied := [0]
@@ -421,7 +421,7 @@ func _test_instant_swap() -> void:
 	facts["enemy_dist"] = 3.0
 	res = await cmd.choose(null, "player-cmd-0003", {"primary": "rifle"})
 	_check(not bool(res["now"]) and "enemy" in str(res["text"]), "an enemy near is refused with the reason", str(res))
-	(host.cvars[DotLoadoutInstantSwap.CVAR_ENABLE] as FakeCvar).set_to("0")
+	(host.cvars[GSLoadoutInstantSwap.CVAR_ENABLE] as FakeCvar).set_to("0")
 	facts["enemy_dist"] = -1.0
 	res = await cmd.choose(null, "player-cmd-0004", {"primary": "rifle"})
 	_check(not bool(res["now"]) and applied[0] == 1, "cvar off: saved for the next spawn")

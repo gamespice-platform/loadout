@@ -22,8 +22,8 @@ var _passed := 0
 var _failed := 0
 var _failures := PackedStringArray()
 
-var _catalogue: DotItemCatalogue = null
-var _schema: DotLoadoutSchema = null
+var _catalogue: GSItemCatalogue = null
+var _schema: GSLoadoutSchema = null
 
 
 # Assertions
@@ -58,98 +58,98 @@ func _group(title: String) -> void:
 
 ## The catalogue a game would ship: free starters, paid unlocks, a retired item and
 ## one whose content is not downloaded yet.
-func _build_catalogue() -> DotItemCatalogue:
-	var pistol := DotItem.make(&"pistol", DotItem.KIND_WEAPON, true)
+func _build_catalogue() -> GSItemCatalogue:
+	var pistol := GSItem.make(&"pistol", GSItem.KIND_WEAPON, true)
 	pistol.slots = [&"secondary"]
 	pistol.cost = 0
 	pistol.weight = 1.0
 
-	var rifle := DotItem.make(&"rifle", DotItem.KIND_WEAPON, true)
+	var rifle := GSItem.make(&"rifle", GSItem.KIND_WEAPON, true)
 	rifle.slots = [&"primary"]
 	rifle.tags = [&"starter"]
 	rifle.cost = 2
 	rifle.weight = 4.0
 
-	var sniper := DotItem.make(&"sniper", DotItem.KIND_WEAPON, false)
+	var sniper := GSItem.make(&"sniper", GSItem.KIND_WEAPON, false)
 	sniper.slots = [&"primary"]
 	sniper.tags = [&"heavy"]
 	sniper.cost = 5
 	sniper.weight = 7.0
 
-	var rocket := DotItem.make(&"rocket", DotItem.KIND_WEAPON, false)
+	var rocket := GSItem.make(&"rocket", GSItem.KIND_WEAPON, false)
 	rocket.slots = [&"primary"]
 	rocket.tags = [&"heavy", &"explosive"]
 	rocket.cost = 6
 	rocket.weight = 9.0
 
-	var grenade := DotItem.make(&"grenade", DotItem.KIND_CONSUMABLE, true)
+	var grenade := GSItem.make(&"grenade", GSItem.KIND_CONSUMABLE, true)
 	grenade.slots = [&"utility"]
 	grenade.count = 2
 	grenade.max_count = 4
 	grenade.cost = 1
 	grenade.weight = 0.5
 
-	var medkit := DotItem.make(&"medkit", DotItem.KIND_CONSUMABLE, true)
+	var medkit := GSItem.make(&"medkit", GSItem.KIND_CONSUMABLE, true)
 	medkit.slots = [&"utility"]
 	medkit.cost = 1
 	medkit.weight = 0.5
 
-	var armour := DotItem.make(&"armour", DotItem.KIND_EQUIPMENT, false)
+	var armour := GSItem.make(&"armour", GSItem.KIND_EQUIPMENT, false)
 	armour.slots = [&"gear"]
 	armour.cost = 3
 	armour.weight = 5.0
 
-	var retired := DotItem.make(&"old_rifle", DotItem.KIND_WEAPON, true)
+	var retired := GSItem.make(&"old_rifle", GSItem.KIND_WEAPON, true)
 	retired.slots = [&"primary"]
 	retired.retired = true
 	retired.cost = 2
 
-	var streamed := DotItem.make(&"gold_rifle", DotItem.KIND_WEAPON, false)
+	var streamed := GSItem.make(&"gold_rifle", GSItem.KIND_WEAPON, false)
 	streamed.slots = [&"primary"]
 	streamed.content_id = "sha256:notdownloadedyet"
 	streamed.fallback_id = &"rifle"
 	streamed.cost = 2
 
 	# Two items, one unlock: buying the pack grants both.
-	var pack_a := DotItem.make(&"camo_rifle", DotItem.KIND_COSMETIC, false)
+	var pack_a := GSItem.make(&"camo_rifle", GSItem.KIND_COSMETIC, false)
 	pack_a.slots = [&"skin"]
 	pack_a.entitlement_id = &"camo_pack"
 
-	var pack_b := DotItem.make(&"camo_pistol", DotItem.KIND_COSMETIC, false)
+	var pack_b := GSItem.make(&"camo_pistol", GSItem.KIND_COSMETIC, false)
 	pack_b.slots = [&"skin"]
 	pack_b.entitlement_id = &"camo_pack"
 
-	return DotItemCatalogue.of([
+	return GSItemCatalogue.of([
 		pistol, rifle, sniper, rocket, grenade, medkit,
 		armour, retired, streamed, pack_a, pack_b,
 	])
 
 
-func _build_schema() -> DotLoadoutSchema:
-	var primary := DotLoadoutSlot.make(&"primary", true, &"rifle")
-	primary.kinds = [DotItem.KIND_WEAPON]
+func _build_schema() -> GSLoadoutSchema:
+	var primary := GSLoadoutSlot.make(&"primary", true, &"rifle")
+	primary.kinds = [GSItem.KIND_WEAPON]
 	primary.arsenal_slot = 1
 	primary.order = 10
 
-	var secondary := DotLoadoutSlot.make(&"secondary", true, &"pistol")
-	secondary.kinds = [DotItem.KIND_WEAPON]
+	var secondary := GSLoadoutSlot.make(&"secondary", true, &"pistol")
+	secondary.kinds = [GSItem.KIND_WEAPON]
 	secondary.arsenal_slot = 2
 	secondary.order = 20
 
-	var utility := DotLoadoutSlot.make(&"utility")
-	utility.kinds = [DotItem.KIND_CONSUMABLE]
+	var utility := GSLoadoutSlot.make(&"utility")
+	utility.kinds = [GSItem.KIND_CONSUMABLE]
 	utility.arsenal_slot = 3
 	utility.order = 30
 
-	var gear := DotLoadoutSlot.make(&"gear")
-	gear.kinds = [DotItem.KIND_EQUIPMENT]
+	var gear := GSLoadoutSlot.make(&"gear")
+	gear.kinds = [GSItem.KIND_EQUIPMENT]
 	gear.order = 40
 
-	var skin := DotLoadoutSlot.make(&"skin")
-	skin.kinds = [DotItem.KIND_COSMETIC]
+	var skin := GSLoadoutSlot.make(&"skin")
+	skin.kinds = [GSItem.KIND_COSMETIC]
 	skin.order = 50
 
-	var schema := DotLoadoutSchema.of(
+	var schema := GSLoadoutSchema.of(
 		&"deathmatch", [primary, secondary, utility, gear, skin], _catalogue
 	)
 	schema.point_budget = 10
@@ -157,8 +157,8 @@ func _build_schema() -> DotLoadoutSchema:
 	return schema
 
 
-func _full_loadout() -> DotLoadout:
-	var loadout := DotLoadout.empty(&"deathmatch")
+func _full_loadout() -> GSLoadout:
+	var loadout := GSLoadout.empty(&"deathmatch")
 	loadout.catalogue_version = _catalogue.version
 	loadout.set_item(&"primary", &"rifle")
 	loadout.set_item(&"secondary", &"pistol")

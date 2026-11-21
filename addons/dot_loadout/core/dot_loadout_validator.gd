@@ -1,4 +1,4 @@
-class_name DotLoadoutValidator
+class_name GSLoadoutValidator
 extends RefCounted
 
 ## Decides whether a loadout is legal, and repairs it when it is not.
@@ -17,7 +17,7 @@ extends RefCounted
 ## refusing it.
 
 # No log channel: static rules. validate() returns the refusal and conform() returns the
-# repairs; DotLoadoutManager, which knows whose loadout it is, logs both.
+# repairs; GSLoadoutManager, which knows whose loadout it is, logs both.
 
 
 ## A repair, for a caller that wants to tell the player what changed.
@@ -42,23 +42,23 @@ class Change extends RefCounted:
 ## that cannot produce a legal loadout has a bug in the screen rather than a need for
 ## better error reporting.
 ##
-## [param rules] are the server owner's ([DotLoadoutRules], null for none): an item they do not
+## [param rules] are the server owner's ([GSLoadoutRules], null for none): an item they do not
 ## permit in its slot is refused with `CODE_FORBIDDEN`, like an item not unlocked.
 static func validate(
-	loadout: DotLoadout,
-	schema: DotLoadoutSchema,
-	entitlements: DotLoadoutEntitlements,
-	rules: DotLoadoutRules = null
-) -> DotResult:
+	loadout: GSLoadout,
+	schema: GSLoadoutSchema,
+	entitlements: GSLoadoutEntitlements,
+	rules: GSLoadoutRules = null
+) -> GSResult:
 	if loadout == null:
-		return DotResult.fail(DotError.CODE_INVALID, "No loadout.")
+		return GSResult.fail(GSError.CODE_INVALID, "No loadout.")
 
 	if schema == null or schema.catalogue == null:
-		return DotResult.fail(DotError.CODE_STATE, "No schema to validate against.")
+		return GSResult.fail(GSError.CODE_STATE, "No schema to validate against.")
 
-	if loadout.size() > DotLoadout.MAX_SLOTS:
-		return DotResult.fail(
-			DotError.CODE_INVALID,
+	if loadout.size() > GSLoadout.MAX_SLOTS:
+		return GSResult.fail(
+			GSError.CODE_INVALID,
 			"A loadout with %d entries." % loadout.size()
 		)
 
@@ -68,8 +68,8 @@ static func validate(
 		var slot := schema.slot(slot_id)
 
 		if slot == null:
-			return DotResult.fail(
-				DotError.CODE_INVALID,
+			return GSResult.fail(
+				GSError.CODE_INVALID,
 				"Slot '%s' is not in schema '%s'." % [slot_id, schema.id]
 			)
 
@@ -77,39 +77,39 @@ static func validate(
 		var item := schema.catalogue.find(item_id)
 
 		if item == null:
-			return DotResult.fail(
-				DotError.CODE_INVALID,
+			return GSResult.fail(
+				GSError.CODE_INVALID,
 				"Item '%s' is not in the catalogue." % item_id
 			)
 
 		if not slot.accepts(item):
-			return DotResult.fail(
-				DotError.CODE_INVALID, slot.rejection(item)
+			return GSResult.fail(
+				GSError.CODE_INVALID, slot.rejection(item)
 			)
 
 		# Retired items stay valid in a saved loadout on purpose — see
-		# [member DotItem.retired] — so this checks selectability, not validity, and
+		# [member GSItem.retired] — so this checks selectability, not validity, and
 		# is deliberately not a failure here.
 
 		# A fixed item is the owner's to hand out, unlocked or not.
 		var server_fixed := rules != null and rules.is_fixed(slot_id)
 
 		if entitlements != null and not server_fixed and not entitlements.allows(item):
-			return DotResult.fail(
-				DotError.CODE_FORBIDDEN,
+			return GSResult.fail(
+				GSError.CODE_FORBIDDEN,
 				"This player is not entitled to '%s'." % item_id
 			)
 
 		if rules != null and not rules.permits(slot_id, item):
-			return DotResult.fail(
-				DotError.CODE_FORBIDDEN,
+			return GSResult.fail(
+				GSError.CODE_FORBIDDEN,
 				"This server does not allow '%s' in the %s slot." % [item_id, slot_id]
 			)
 
 		if not schema.allow_duplicates:
 			if seen_items.has(item_id):
-				return DotResult.fail(
-					DotError.CODE_INVALID,
+				return GSResult.fail(
+					GSError.CODE_INVALID,
 					"Item '%s' appears in two slots and this schema forbids it."
 						% item_id
 				)
@@ -118,16 +118,16 @@ static func validate(
 		var count := loadout.count_in(slot_id, item.count)
 
 		if count < 1 or count > item.carry_limit():
-			return DotResult.fail(
-				DotError.CODE_INVALID,
+			return GSResult.fail(
+				GSError.CODE_INVALID,
 				"A count of %d for '%s', which allows at most %d."
 					% [count, item_id, item.carry_limit()]
 			)
 
 	for slot in schema.required_slots():
 		if not loadout.has_slot(slot.id):
-			return DotResult.fail(
-				DotError.CODE_INVALID,
+			return GSResult.fail(
+				GSError.CODE_INVALID,
 				"Required slot '%s' is empty." % slot.id
 			)
 
@@ -135,29 +135,29 @@ static func validate(
 	if budget > 0:
 		var points := schema.points_used(loadout)
 		if points > budget:
-			return DotResult.fail(
-				DotError.CODE_INVALID,
+			return GSResult.fail(
+				GSError.CODE_INVALID,
 				"This loadout costs %d points against a budget of %d (%s; each item's cost is its loadout_cost in the weapon profile)."
-					% [points, budget, DotLoadoutRules.CVAR_BUDGET]
+					% [points, budget, GSLoadoutRules.CVAR_BUDGET]
 			)
 
 	if schema.weight_budget > 0.0:
 		var weight := schema.weight_used(loadout)
 		if weight > schema.weight_budget + 0.0001:
-			return DotResult.fail(
-				DotError.CODE_INVALID,
+			return GSResult.fail(
+				GSError.CODE_INVALID,
 				"This loadout weighs %.1f against a limit of %.1f."
 					% [weight, schema.weight_budget]
 			)
 
-	return DotResult.success(null)
+	return GSResult.success(null)
 
 
 ## Repairs a loadout in place so that [method validate] would pass, and reports what
 ## changed.
 ##
 ## Never fails: the schema's default loadout is always reachable, which is why
-## [method DotLoadoutSchema.validate] refuses a schema whose defaults are not
+## [method GSLoadoutSchema.validate] refuses a schema whose defaults are not
 ## themselves legal. A conform that could fail would leave a player unable to spawn.
 ##
 ## The order matters. Unknown slots and illegal items go first, then required slots
@@ -168,10 +168,10 @@ static func validate(
 ## owner said, so it is never the thing a budget trims), and anything the rules do not permit is
 ## removed and refilled like a retired item.
 static func conform(
-	loadout: DotLoadout,
-	schema: DotLoadoutSchema,
-	entitlements: DotLoadoutEntitlements,
-	rules: DotLoadoutRules = null
+	loadout: GSLoadout,
+	schema: GSLoadoutSchema,
+	entitlements: GSLoadoutEntitlements,
+	rules: GSLoadoutRules = null
 ) -> Array[Change]:
 	var changes: Array[Change] = []
 
@@ -254,7 +254,7 @@ static func conform(
 ## Writes the server's fixed slots. Not entitlement-checked: the owner handing everybody a weapon
 ## is the owner's call, and a fixed item a player has not unlocked is the point of a fixed item.
 static func apply_fixed(
-	loadout: DotLoadout, schema: DotLoadoutSchema, rules: DotLoadoutRules
+	loadout: GSLoadout, schema: GSLoadoutSchema, rules: GSLoadoutRules
 ) -> Array[Change]:
 	var changes: Array[Change] = []
 	var slot_ids: Array = rules.fixed.keys()
@@ -273,7 +273,7 @@ static func apply_fixed(
 			continue
 		var item := schema.catalogue.find(want)
 		if item == null or not slot.accepts(item):
-			# DotLoadoutRules.check refuses this; a caller that skipped it gets the slot left as it
+			# GSLoadoutRules.check refuses this; a caller that skipped it gets the slot left as it
 			# was rather than an item the slot cannot hold.
 			continue
 		loadout.set_item(slot_id, want)
@@ -286,11 +286,11 @@ static func apply_fixed(
 ## The best item that could fill a required slot: its default first, then anything
 ## legal.
 static func _fillable(
-	slot: DotLoadoutSlot,
-	schema: DotLoadoutSchema,
-	entitlements: DotLoadoutEntitlements,
+	slot: GSLoadoutSlot,
+	schema: GSLoadoutSchema,
+	entitlements: GSLoadoutEntitlements,
 	taken: Dictionary,
-	rules: DotLoadoutRules = null
+	rules: GSLoadoutRules = null
 ) -> StringName:
 	if rules != null and rules.is_fixed(slot.id):
 		return rules.fixed[slot.id]
@@ -321,9 +321,9 @@ static func _fillable(
 ## the loadout straight back into the branch above, and dropping cheap things first
 ## can take several removals to achieve what one takes.
 static func _trim_budgets(
-	loadout: DotLoadout,
-	schema: DotLoadoutSchema,
-	rules: DotLoadoutRules = null
+	loadout: GSLoadout,
+	schema: GSLoadoutSchema,
+	rules: GSLoadoutRules = null
 ) -> Array[Change]:
 	var changes: Array[Change] = []
 
@@ -333,7 +333,7 @@ static func _trim_budgets(
 
 	# Bounded rather than while(true): a bug in the cost arithmetic that never brings
 	# the total down would otherwise hang the server on the join path.
-	for _pass in range(DotLoadout.MAX_SLOTS):
+	for _pass in range(GSLoadout.MAX_SLOTS):
 		var over_points := (
 			budget > 0
 			and schema.points_used(loadout) > budget

@@ -1,4 +1,4 @@
-class_name DotLoadoutEntitlements
+class_name GSLoadoutEntitlements
 extends RefCounted
 
 ## What one player is allowed to take.
@@ -8,10 +8,10 @@ extends RefCounted
 ## is loud and gets fixed in a minute. One that starts full makes an unwired server
 ## accept everything, which is silent and is a game where every unlock is free.
 ##
-## An item marked [member DotItem.free] is available regardless — that is what the
+## An item marked [member GSItem.free] is available regardless — that is what the
 ## flag is for, and it is how a starting pistol works without a grant.
 ##
-## The same shape as [code]DotAvatarEntitlements[/code], and deliberately a separate
+## The same shape as [code]GSAvatarEntitlements[/code], and deliberately a separate
 ## class: only GameSpice Core is a hard dependency in this family, and a game that wants
 ## loadouts without avatars must not have to install one to get the other.
 
@@ -22,20 +22,20 @@ var _held: Dictionary = {}
 var unrestricted: bool = false
 
 
-static func none() -> DotLoadoutEntitlements:
-	return DotLoadoutEntitlements.new()
+static func none() -> GSLoadoutEntitlements:
+	return GSLoadoutEntitlements.new()
 
 
-static func of(ids: Array) -> DotLoadoutEntitlements:
-	var entitlements := DotLoadoutEntitlements.new()
+static func of(ids: Array) -> GSLoadoutEntitlements:
+	var entitlements := GSLoadoutEntitlements.new()
 	for id in ids:
 		entitlements.grant(StringName(id))
 	return entitlements
 
 
 ## Everything, including items nobody has bought. See [member unrestricted].
-static func everything() -> DotLoadoutEntitlements:
-	var entitlements := DotLoadoutEntitlements.new()
+static func everything() -> GSLoadoutEntitlements:
+	var entitlements := GSLoadoutEntitlements.new()
 	entitlements.unrestricted = true
 	return entitlements
 
@@ -50,10 +50,10 @@ func revoke(unlock_id: StringName) -> void:
 
 ## Whether this player may take [param item].
 ##
-## Takes the item rather than an id so the [member DotItem.free] flag and the
-## [method DotItem.unlock_id] indirection are applied in one place. A caller that
+## Takes the item rather than an id so the [member GSItem.free] flag and the
+## [method GSItem.unlock_id] indirection are applied in one place. A caller that
 ## checked the raw id would miss both.
-func allows(item: DotItem) -> bool:
+func allows(item: GSItem) -> bool:
 	if item == null:
 		return false
 
@@ -83,7 +83,7 @@ func to_list() -> Array[StringName]:
 	return out
 
 
-func merge(other: DotLoadoutEntitlements) -> void:
+func merge(other: GSLoadoutEntitlements) -> void:
 	if other == null:
 		return
 
@@ -104,5 +104,5 @@ func describe() -> Dictionary:
 
 func _to_string() -> String:
 	if unrestricted:
-		return "DotLoadoutEntitlements(unrestricted)"
-	return "DotLoadoutEntitlements(%d)" % count()
+		return "GSLoadoutEntitlements(unrestricted)"
+	return "GSLoadoutEntitlements(%d)" % count()
