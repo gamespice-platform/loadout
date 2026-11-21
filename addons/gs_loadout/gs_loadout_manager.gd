@@ -14,7 +14,7 @@ extends Node
 ## [member service_scope] is how they coexist.
 
 const CHANNEL := "loadout"
-const SERVICE := &"dot_loadout"
+const SERVICE := &"gs_loadout"
 
 ## A player's loadouts were loaded or changed.
 signal loadouts_changed(user_key: String)

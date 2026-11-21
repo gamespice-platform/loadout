@@ -25,7 +25,7 @@ extends RefCounted
 ## [b]Nothing here names GameSpice Server.[/b] The host is any object with `add_command(name, handler,
 ## description, permission)` and `add_cvar(name, default, description, flags)`; a command context
 ## is read for `args`, `session`, `reply` and `reply_lines`; the notice script is loaded by path and
-## the server found as `dot_server` in [GSRegistry], as GameSpice Vote's map menu does.
+## the server found as `gs_server` in [GSRegistry], as GameSpice Vote's map menu does.
 
 const CHANNEL := "loadout.command"
 
@@ -33,7 +33,7 @@ const CHANNEL := "loadout.command"
 const TOPIC := &"loadout_menu"
 const COMMAND := "loadout"
 
-const NOTICE_SCRIPT := "res://addons/dot_server/net/dot_notice.gd"
+const NOTICE_SCRIPT := "res://addons/gs_server/net/gs_notice.gd"
 
 ## GameSpice Server's `GSConVar.FLAG_ARCHIVE | FLAG_NOTIFY`, by value: an owner's choice is saved, and a
 ## change is said in chat.
@@ -570,7 +570,7 @@ func _send(ctx: Object, data: Dictionary) -> bool:
 	var session: Variant = ctx.get("session") if ctx != null else null
 	if not (session is Object) or not ResourceLoader.exists(NOTICE_SCRIPT):
 		return false
-	var server: Object = GSRegistry.get_service(&"dot_server")
+	var server: Object = GSRegistry.get_service(&"gs_server")
 	if server == null or not server.has_method("send_notice"):
 		return false
 	var notice: Object = (load(NOTICE_SCRIPT) as GDScript).call("make", &"", "", -1.0, TOPIC, data)

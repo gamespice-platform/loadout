@@ -6,7 +6,7 @@ Part of the [**GameSpice**](https://gamespice.net) collection: modular, MIT-lice
 
 ## Install
 
-Copy `addons/dot_loadout/` and [GameSpice Core](https://github.com/gamespice-platform/core)'s `addons/dot_core/` into your project and enable both in **Project > Project Settings > Plugins**. dot-core and dot-save are the dependencies.
+Copy `addons/gs_loadout/` and [GameSpice Core](https://github.com/gamespice-platform/core)'s `addons/gs_core/` into your project and enable both in **Project > Project Settings > Plugins**. gs-core and gs-save are the dependencies.
 
 ## Use
 

@@ -13,7 +13,7 @@ signal refreshed(player_key: String)
 const CHANNEL := "loadout.site"
 const PATH := "store/entitlements"
 ## GameSpice Cloud's verifier, loaded by path so a game without GameSpice Cloud still runs (and refuses every token).
-const CLOUD_SIGNATURE := "res://addons/dot_cloud/verify/dot_cloud_signature.gd"
+const CLOUD_SIGNATURE := "res://addons/gs_cloud/verify/gs_cloud_signature.gd"
 ## The newest token version read; 2 signs each item's unlock ids, 1 signs only the item keys.
 const TOKEN_VERSION := 2
 const OLDEST_TOKEN_VERSION := 1
@@ -176,7 +176,7 @@ static func verify_token_any(
 ## a raw Ed25519 key needs its `verify_ed25519(bytes, signature, key_bytes)`, and fails loudly without.
 static func cloud_verify(bytes: PackedByteArray, signature: PackedByteArray, key: String) -> GSResult:
 	if not ResourceLoader.exists(CLOUD_SIGNATURE):
-		return GSResult.fail(GSError.CODE_STATE, "dot-cloud is not installed, so site tokens cannot be verified.")
+		return GSResult.fail(GSError.CODE_STATE, "gs-cloud is not installed, so site tokens cannot be verified.")
 	var script: Script = load(CLOUD_SIGNATURE)
 	if key.contains("BEGIN PUBLIC KEY"):
 		return script.call("verify", bytes, Marshalls.raw_to_base64(signature), key)
@@ -186,7 +186,7 @@ static func cloud_verify(bytes: PackedByteArray, signature: PackedByteArray, key
 	for m: Dictionary in script.get_script_method_list():
 		if m.get("name") == "verify_ed25519":
 			return script.call("verify_ed25519", bytes, signature, raw)
-	return GSResult.fail(GSError.CODE_UNSUPPORTED, "This dot-cloud has no Ed25519 verifier, so TMC's token cannot be checked.")
+	return GSResult.fail(GSError.CODE_UNSUPPORTED, "This gs-cloud has no Ed25519 verifier, so TMC's token cannot be checked.")
 
 
 ## Reads the player's entitlements, points and loadout now. The value is the id array. A token that
@@ -393,7 +393,7 @@ static func layered(base: Callable = Callable(), config: GSLoadoutConfig = null)
 			if got is GSLoadoutEntitlements:
 				ent.merge(got)
 		if site.client == null:
-			site.client = GSRegistry.get_service(&"dot_backbone_client")
+			site.client = GSRegistry.get_service(&"gs_backbone_client")
 		if site.client != null and not site._configured:
 			site._configure(config)
 		if site.client != null:

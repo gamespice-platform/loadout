@@ -7,23 +7,23 @@ extends EditorPlugin
 ## once, and a singleton loadout manager makes that impossible. [GSLoadoutManager]
 ## registers itself in [GSRegistry] instead.
 
-const _ICON := "res://addons/dot_loadout/icon_placeholder.svg"
+const _ICON := "res://addons/gs_loadout/icon_placeholder.svg"
 
 const _TYPES := [
 	[
 		"GSLoadoutManager",
 		"Node",
-		"res://addons/dot_loadout/dot_loadout_manager.gd",
+		"res://addons/gs_loadout/gs_loadout_manager.gd",
 	],
 	[
 		"GSPickup",
 		"Node3D",
-		"res://addons/dot_loadout/world/dot_pickup.gd",
+		"res://addons/gs_loadout/world/gs_pickup.gd",
 	],
 	[
 		"GSPickupField",
 		"Node",
-		"res://addons/dot_loadout/world/dot_pickup_field.gd",
+		"res://addons/gs_loadout/world/gs_pickup_field.gd",
 	],
 ]
 

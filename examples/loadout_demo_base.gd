@@ -1,6 +1,6 @@
 extends Node
 
-## Exercises everything in dot-loadout, offline; exits non-zero on any failure.
+## Exercises everything in gs-loadout, offline; exits non-zero on any failure.
 ## Run: godot --headless --path . res://examples/loadout_demo.tscn
 ## Focus: mistakes that are vulnerabilities (locked items, wrong slot, budget, schema change).
 

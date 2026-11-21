@@ -9,7 +9,7 @@ func _ready() -> void:
 
 
 func _run() -> void:
-	print("dot-loadout self-test")
+	print("gs-loadout self-test")
 	print("")
 
 	GSPaths.remove_tree(LOADOUT_DIR)
@@ -145,7 +145,7 @@ func _test_site_token_rejection(site: FakeSite) -> GSLoadoutConfig:
 	unpinned.public_key = "PINNED"
 	unpinned.audience = "game-test"
 	res = await unpinned.refresh("p2")
-	_check(not res.ok and unpinned.ids_of("p2").is_empty(), "without dot-cloud's verifier the token is refused, not trusted", str(res))
+	_check(not res.ok and unpinned.ids_of("p2").is_empty(), "without gs-cloud's verifier the token is refused, not trusted", str(res))
 	var raw := GSLoadoutSiteSource.cloud_verify(PackedByteArray(), PackedByteArray(), GSHash.base64url_encode(PackedByteArray([1, 2])))
 	_check(not raw.ok, "cloud_verify fails loudly when it cannot verify", str(raw))
 	_check(why.size() == 6, "every rejection was signalled", str(why.size()))
@@ -220,7 +220,7 @@ func _cloud_has_ed25519() -> bool:
 func _test_site_source_ed25519() -> void:
 	_section("site token, real Ed25519")
 	if not _cloud_has_ed25519():
-		_check(true, "skipped: no dot-cloud with verify_ed25519 beside this addon")
+		_check(true, "skipped: no gs-cloud with verify_ed25519 beside this addon")
 		_check(true, "skipped: no Ed25519 verifier to refuse an edited payload")
 		_check(true, "skipped: no Ed25519 verifier to refuse another key")
 		_done()
@@ -232,7 +232,7 @@ func _test_site_source_ed25519() -> void:
 	src.public_key = ED25519_SITE_KEY
 	src.audience = "game-test"
 	var res: GSResult = await src.refresh("p1")
-	_check(res.ok and src.ids_of("p1") == ["skin.gold"], "a token signed with Ed25519 verifies through dot-cloud and grants its items", str(res))
+	_check(res.ok and src.ids_of("p1") == ["skin.gold"], "a token signed with Ed25519 verifies through gs-cloud and grants its items", str(res))
 	var parts := ED25519_SITE_TOKEN.split(".")
 	site.body["token"] = GSHash.base64url_encode_text(GSHash.base64url_decode_text(parts[0]).replace("skin.gold", "skin.free")) + "." + parts[1]
 	res = await src.refresh("p1")

@@ -3,7 +3,7 @@ class_name GSLoadoutConfig
 extends GSConfig
 
 ## Everything configurable about loadouts. Layered like every [GSConfig]: exported
-## defaults, then a JSON file, then [code]DOT_LOADOUT_*[/code] environment variables,
+## defaults, then a JSON file, then [code]GS_LOADOUT_*[/code] environment variables,
 ## then [code]--loadout-*[/code] arguments.
 
 @export_group("Storage")
@@ -50,7 +50,7 @@ extends GSConfig
 ## [b]The game enforces this, not the manager.[/b] A publish is stored either way —
 ## refusing it would lose the player's choice — and "alive" is something only the
 ## game knows. Read this when deciding whether to re-equip on publish or wait for
-## the next spawn; dot-2d-hungry sets it false and equips on spawn.
+## the next spawn; gs-2d-hungry sets it false and equips on spawn.
 @export var allow_live_changes: bool = false
 
 @export_group("Limits")
@@ -134,7 +134,7 @@ func site_pinned() -> bool:
 
 
 func env_prefix() -> String:
-	return "DOT_LOADOUT_"
+	return "GS_LOADOUT_"
 
 
 func cli_prefix() -> String:

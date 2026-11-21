@@ -10,9 +10,9 @@ config_version=5
 
 [application]
 
-config/name="dot-loadout"
+config/name="gs-loadout"
 config/features=PackedStringArray("4.7")
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/dot_loadout/plugin.cfg")
+enabled=PackedStringArray("res://addons/gs_loadout/plugin.cfg")
