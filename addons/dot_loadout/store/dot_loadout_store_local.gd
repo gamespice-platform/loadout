@@ -21,9 +21,11 @@ var max_files: int = 20000
 
 var directory: String = "user://loadouts"
 
-## Write through a temporary file and rename over the target. [method DotPaths.write_json]
-## already does the temporary file, the rename and the browser's IndexedDB flush.
+## Write through a temporary file and rename over the target. [DotSaveStoreFile] does the
+## temporary file, the rename and the browser's IndexedDB flush.
 var atomic_writes: bool = true
+
+var _files: DotSaveStoreFile
 
 
 static func at(path: String) -> DotLoadoutStoreLocal:
@@ -49,14 +51,31 @@ func _open() -> DotResult:
 	return DotResult.success(true)
 
 
+## The file store under this one, with the folder, quota and write mode as they stand now.
+func files() -> DotSaveStoreFile:
+	if _files == null:
+		_files = DotSaveStoreFile.new()
+		_files.suffix = ".json"
+		_files.key_check = func(key: String) -> bool: return DotPaths.safe_relative(key + ".json").ok
+	_files.directory = directory
+	_files.atomic = atomic_writes
+	_files.max_files = max_files
+	return _files
+
+
+# ':' is legal in a key but not in a filename on every platform; '~' is in neither's alphabet.
+func _file_key(user_key: String) -> String:
+	return user_key.replace(":", "~")
+
+
 func _path_for(user_key: String) -> DotResult:
-	# ':' is legal in a key but not in a filename on every platform; '~' is in neither's alphabet.
-	var relative := DotPaths.safe_relative("%s.json" % user_key.replace(":", "~"))
+	var key := _file_key(user_key)
+	var relative := DotPaths.safe_relative("%s.json" % key)
 
 	if not relative.ok:
 		return relative.wrap("That key is not a usable filename.")
 
-	return DotResult.success("%s/%s" % [directory, relative.value])
+	return DotResult.success(files().path_for(key))
 
 
 func _fetch(user_key: String) -> DotResult:
@@ -116,23 +135,13 @@ func _size_of(path: String) -> int:
 	return file.get_length() if file != null else 0
 
 
-## Renames an unreadable file to `.corrupt` and reports "no loadouts": the player can save
+## Moves an unreadable file aside to `.corrupt` and reports "no loadouts": the player can save
 ## again, and the old bytes stay on disk for a person to recover.
 func _set_aside(path: String, why: String) -> DotResult:
-	var err := DirAccess.rename_absolute(path, path + ".corrupt")
-	DotLog.warn(LOCAL_CHANNEL, "a loadout file was set aside", {"path": path, "why": why, "rename": err})
-	DotWeb.sync_filesystem()
+	var moved := files().set_aside(path.get_file().trim_suffix(".json"))
+	if not moved.ok:
+		DotLog.warn(LOCAL_CHANNEL, "a loadout file could not be set aside", {"path": path, "why": why})
 	return DotResult.success(null)
-
-
-func _file_count() -> int:
-	var count := 0
-
-	for name in DirAccess.get_files_at(directory):
-		if name.ends_with(".json"):
-			count += 1
-
-	return count
 
 
 func _store(user_key: String, loadouts: Array[DotLoadout]) -> DotResult:
@@ -153,12 +162,12 @@ func _store(user_key: String, loadouts: Array[DotLoadout]) -> DotResult:
 			DotError.CODE_QUOTA, "Your saved loadouts are too large (mp_loadout_store_max_bytes %d)." % max_file_bytes
 		)
 
-	if max_files > 0 and not FileAccess.file_exists(path.value) and _file_count() >= max_files:
+	var written := files().write(_file_key(user_key), text)
+
+	if written.code() == DotError.CODE_QUOTA:
 		return DotResult.fail(
 			DotError.CODE_QUOTA, "This server keeps no more players' loadouts (mp_loadout_store_max_files %d)." % max_files
 		)
-
-	var written := DotPaths.write_text(path.value, text, atomic_writes)
 
 	if not written.ok:
 		return written.wrap("Could not write the loadouts.")
@@ -175,23 +184,11 @@ func _remove(user_key: String) -> DotResult:
 	if not FileAccess.file_exists(path.value):
 		return DotResult.success(true)
 
-	var dir := DirAccess.open(directory)
+	var removed := files().remove(_file_key(user_key))
 
-	if dir == null:
-		return DotResult.fail(
-			DotError.CODE_IO, "Could not open the loadout directory.", directory
-		)
+	if not removed.ok:
+		return removed.wrap("Removing the loadouts")
 
-	var removed := dir.remove(String(path.value).get_file())
-
-	if removed != OK:
-		return DotResult.failure(
-			DotError.from_engine(removed, "Removing the loadouts")
-		)
-
-	# DotPaths flushes on write; a deletion goes through DirAccess directly, so on a
-	# web build it has to be flushed here or the file returns on the next load.
-	DotWeb.sync_filesystem()
 	return DotResult.success(true)
 
 

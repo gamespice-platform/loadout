@@ -4,7 +4,7 @@ What a player takes into a match: a schema of slots, a catalogue of items, saved
 
 Read the family [CLAUDE.md](../../CLAUDE.md) first.
 
-**The distributable is `addons/dot_loadout/`.** It requires [GameSpice Core](../dot-core) and nothing else (`ln -s ../../dot-core/addons/dot_core addons/dot_core`, gitignored); `DotLoadoutSiteSource` loads dot-cloud's signature verifier by path when it is installed, and without it refuses every site token. It names no class outside dot-core in code; dot-weapon's `DotWeaponLoadoutBridge` consumes `DotLoadoutManager.resolve`'s output by duck typing.
+**The distributable is `addons/dot_loadout/`.** It requires [GameSpice Core](../dot-core) and [GameSpice Save](../dot-save) (`ln -s ../../dot-save/addons/dot_save addons/dot_save`, gitignored; the file store lives there) (`ln -s ../../dot-core/addons/dot_core addons/dot_core`, gitignored); `DotLoadoutSiteSource` loads dot-cloud's signature verifier by path when it is installed, and without it refuses every site token. It names no class outside dot-core in code; dot-weapon's `DotWeaponLoadoutBridge` consumes `DotLoadoutManager.resolve`'s output by duck typing.
 
 ## Read before
 
