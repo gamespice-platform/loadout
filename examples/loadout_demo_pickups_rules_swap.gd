@@ -92,6 +92,18 @@ func _check_pickups_client(field: GSPickupField, health: GSPickup, ammo: GSPicku
 	ammo.free()
 	_check(field.sweep(13, Vector3.ZERO, 500).size() == 1 and field.pickups().size() == 1, "a pickup freed since the refresh is dropped, not touched")
 
+	# The sweep's per-tick reach table follows a pickup that moved between ticks and agrees with in_range.
+	field.reset(600)
+	health.position = Vector3(30.0, 0.0, 0.0)
+	var far_probe := Vector3(30.5, 0.5, 0.0)
+	_check(field.sweep(14, Vector3.ZERO, 600).is_empty() and health.available, "a moved pickup is out of reach of where it was")
+	var moved := field.sweep(15, far_probe, 601)
+	_check(moved.size() == 1 and not health.available, "and in reach where it now stands, a tick later")
+	field.reset(700)
+	for probe in [Vector3(30.0, 0.0, 1.19), Vector3(30.0, 0.0, 1.21), Vector3(30.0, 2.0, 0.0), Vector3(30.0, 2.01, 0.0)]:
+		field.reset(700)
+		_check(health.in_range(probe) == (field.sweep(16, probe, 700 + int(probe.z * 100.0) + int(probe.y * 1000.0)).size() == 1), "sweep reach equals in_range at %s" % probe)
+
 
 
 func _check_freed_pickup(field: GSPickupField) -> void:

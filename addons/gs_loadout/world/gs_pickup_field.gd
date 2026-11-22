@@ -50,6 +50,14 @@ var tags_fn: Callable = Callable()
 
 var _collected: int = 0
 
+## The reach table of the authority's sweeps: each pickup's world position, radius and height as read once
+## for [member _table_tick], so a tick's sweeps (one per player) do not read every node's transform again.
+## Pickups are taken to stand still within a tick; the next tick reads them again.
+var _table_tick: int = -1
+var _table_pos: PackedVector3Array = PackedVector3Array()
+var _table_radius: PackedFloat64Array = PackedFloat64Array()
+var _table_height: PackedFloat64Array = PackedFloat64Array()
+
 
 func _ready() -> void:
 	if Engine.is_editor_hint():
@@ -60,6 +68,7 @@ func _ready() -> void:
 ## Re-collects the pickups. Call after building a level at runtime.
 func refresh() -> void:
 	_pickups.clear()
+	_table_tick = -1
 
 	var root: Node = self
 
@@ -117,12 +126,23 @@ func tick(current_tick: int) -> int:
 func sweep(taker: int, position: Vector3, current_tick: int) -> Array[GSPickup]:
 	_prune()
 	var out: Array[GSPickup] = []
+	var use_table := is_authority
+	if use_table and _table_tick != current_tick:
+		_build_table(current_tick)
 
-	for pickup in _pickups:
+	for i in range(_pickups.size()):
+		var pickup := _pickups[i]
 		if not pickup.available:
 			continue
 
-		if not pickup.in_range(position):
+		if use_table:
+			# GSPickup.in_range, on the values read once this tick.
+			var offset := position - _table_pos[i]
+			if absf(offset.y) > _table_height[i]:
+				continue
+			if Vector2(offset.x, offset.z).length() > _table_radius[i]:
+				continue
+		elif not pickup.in_range(position):
 			continue
 
 		if not _tags_allow(taker, pickup):
@@ -148,6 +168,19 @@ func sweep(taker: int, position: Vector3, current_tick: int) -> Array[GSPickup]:
 		collected.emit(pickup, taker, current_tick)
 
 	return out
+
+
+func _build_table(current_tick: int) -> void:
+	var n := _pickups.size()
+	_table_pos.resize(n)
+	_table_radius.resize(n)
+	_table_height.resize(n)
+	for i in range(n):
+		var pickup := _pickups[i]
+		_table_pos[i] = pickup.global_position
+		_table_radius[i] = pickup.radius
+		_table_height[i] = pickup.height
+	_table_tick = current_tick
 
 
 func _tags_allow(taker: int, pickup: GSPickup) -> bool:
@@ -191,6 +224,7 @@ func _prune() -> void:
 	for i in range(_pickups.size() - 1, -1, -1):
 		if not is_instance_valid(_pickups[i]):
 			_pickups.remove_at(i)
+			_table_tick = -1
 
 
 func describe_lines() -> PackedStringArray:
