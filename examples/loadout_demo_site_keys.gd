@@ -143,6 +143,7 @@ func _test_site_keys_grace(src: GSLoadoutSiteSource, site: KeySite, new_key: Str
 	reads = site.reads("store/keys")
 	_clock[0] += 10_000_000.0
 	_check((await src.refresh("p1")).ok and site.reads("store/keys") == reads, "site_keys_ttl_sec 0 keeps the list until an unknown kid")
+	_check(await _concurrent_audience(new_key), "bots verifying at once on a fresh server share one GET me and all verify")
 	_done()
 
 
@@ -192,6 +193,28 @@ func _concurrent_first_read() -> bool:
 	for r: GSResult in results:
 		all_ok = all_ok and r.ok
 	return all_ok and site.reads("store/keys") == 1
+
+
+## Three bots ingest while the first GET me is in flight: none may fail with "No site audience".
+func _concurrent_audience(key: String) -> bool:
+	var site := KeySite.new()
+	site.keys_body = _key_list([key])
+	site.me_body = {"ok": true, "target": {"kind": "server", "id": 7.0}}
+	site.delay_frames = 3
+	var src: GSLoadoutSiteSource = GSLoadoutSiteSource.from_config(GSLoadoutConfig.new(), site).value
+	_follow(src)
+	var results: Array = []
+	var run := func(p: String) -> void:
+		results.append(await src.ingest(p, _keyed_body(p, key, ["skin.gold"])))
+	run.call("p1")
+	run.call("p2")
+	run.call("p3")
+	while results.size() < 3:
+		await Engine.get_main_loop().process_frame
+	var all_ok := true
+	for r: GSResult in results:
+		all_ok = all_ok and r.ok
+	return all_ok and site.reads(GSLoadoutSiteSource.ME_PATH) == 1
 
 
 func _follow(src: GSLoadoutSiteSource) -> void:

@@ -59,6 +59,8 @@ var _cache: Dictionary = {}
 var _inflight: Dictionary = {}
 var _configured := false
 var _audience_tried_at: float = -1.0
+var _audience_learning: bool = false
+signal _audience_learned
 
 
 static func with_client(p_client: Object) -> GSLoadoutSiteSource:
@@ -253,7 +255,18 @@ func _keys_for(token: String, sent_key: String) -> GSResult:
 
 ## Following, with no [member audience] set: asks the site which target this credential is for
 ## (`GET me` -> `target {kind, id}`), at most once per [member GSLoadoutSiteKeys.refetch_min_sec].
+## A caller arriving while the read is in flight waits for it instead of returning early.
 func _learn_audience() -> void:
+	if _audience_learning:
+		await _audience_learned
+		return
+	_audience_learning = true
+	await _fetch_audience()
+	_audience_learning = false
+	_audience_learned.emit()
+
+
+func _fetch_audience() -> void:
 	var now := Time.get_unix_time_from_system()
 	var gap := keys.refetch_min_sec if keys != null else 30.0
 	if client == null or (_audience_tried_at >= 0.0 and gap > 0.0 and now - _audience_tried_at < gap):
