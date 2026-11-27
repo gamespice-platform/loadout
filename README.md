@@ -2,7 +2,7 @@
 
 What a player takes into a match, as a small document a dedicated server can validate against a schema and the player's entitlements without loading any game content. Also items, slots, optional budgets, stores and deterministic world pickups.
 
-Part of the [**GameSpice**](https://gamespice.net) collection: modular, MIT-licensed building blocks for games on the GameSpice platform (only the TMC website back end is closed). It was built with Claude Code and its headless suite passes, but little of it has met real players yet, so expect rough edges and please report what you find.
+gs-loadout is a [GameSpice](https://gamespice.net) addon. It is MIT licensed, built with Claude Code, and has a headless suite in `examples/loadout_demo.tscn`. The games in [Zee's Games](https://zeesgames.com) are built on the GameSpice addons and run on live servers, and some of them keep their players' kits in it.
 
 ## Install
 
@@ -56,6 +56,19 @@ godot --headless --path . res://examples/loadout_demo.tscn
 ```
 
 The demo is the suite, runs offline and exits non-zero on failure.
+
+## Used by
+
+These games ship a copy of it:
+
+- [Fatal Contact](https://zeesgames.com/fatal-contact)
+- [Airdrift](https://zeesgames.com/airdrift) - the loadout document behind its arsenal
+- [Playlot](https://zeesgames.com/playlot)
+- [Hungario](https://zeesgames.com/hungario)
+- [Zombie Zone](https://zeesgames.com/zombie-zone)
+- [Prop Hunt](https://zeesgames.com/prop-hunt)
+
+The whole collection is at [zeesgames.com](https://zeesgames.com).
 
 ## Licence
 
